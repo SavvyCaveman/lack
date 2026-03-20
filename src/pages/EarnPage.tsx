@@ -6,7 +6,9 @@ import {
   DollarSign, Play, ChevronRight, X, Shield,
   ToggleLeft, ToggleRight, Trophy, Newspaper, Clapperboard,
   Wrench, MapPin, CheckCircle, AlertCircle, Star, Gift,
+  ChevronDown, ChevronUp, Wifi, BarChart2, SlidersHorizontal
 } from "lucide-react";
+const Calculator = SlidersHorizontal;
 import confetti from "canvas-confetti";
 
 // ---- Profile Onboarding Modal (+20¢ welcome bonus) ----
@@ -656,101 +658,296 @@ function PayoutModal({ account, onClose }: { account: { balanceCents: number; pa
   );
 }
 
-// Stub components — will be replaced by full monetization build
-function PassiveIncomeSection() {
-  return (
-    <div className="bg-zinc-900/60 border border-purple-500/20 rounded-2xl p-6 text-center">
-      <div className="text-2xl mb-2">😴</div>
-      <h3 className="text-white font-bold mb-1">Earn While You Sleep — Passive Income</h3>
-      <p className="text-zinc-400 text-sm">Background earning options coming soon. Keep LACK open to earn passively.</p>
-    </div>
-  );
-}
+// ---- Offerwall Section (TapJoy/Unity placeholder) ----
+function OfferwallSection() {
+  const offersQuery = useQuery({ queryKey: ["availableOffers"], queryFn: () => rpc.getAvailableOffers() });
+  const queryClient = useQueryClient();
+  const [activeOffer, setActiveOffer] = useState<{ id: string; title: string; reward: number } | null>(null);
+  const [claimedIds, setClaimedIds] = useState<string[]>([]);
 
-function FinanceCorner() {
-  const tips = [
-    "Opening a high-yield savings account can earn 5x more interest than a standard account.",
-    "The 50/30/20 rule: 50% needs, 30% wants, 20% savings — even on a tight budget.",
-    "Checking your credit score is free and never hurts your credit rating.",
-    "SNAP benefits can be used at many farmers markets — often doubling your buying power.",
-    "Many utility companies offer low-income assistance programs — call and ask.",
-    "Gig work income qualifies for the Earned Income Tax Credit — worth up to $7,000.",
-    "Library cards give free access to job boards, e-learning, and business software.",
-    "Many banks offer second-chance checking accounts with no minimum balance.",
-    "Section 8 waitlists are open in many cities — apply even if the wait is long.",
-    "Most hospitals have charity care programs — medical debt can often be forgiven.",
-  ];
-  const tip = tips[Math.floor(Date.now() / 86400000) % tips.length];
+  const completeMutation = useMutation({
+    mutationFn: (o: { id: string; title: string; reward: number }) => rpc.completeOffer(o.id, o.title, o.reward),
+    onSuccess: (_, vars) => {
+      setClaimedIds((p) => [...p, vars.id]);
+      setActiveOffer(null);
+      void queryClient.invalidateQueries({ queryKey: ["myEarnings"] });
+      confetti({ particleCount: 60, spread: 50, origin: { y: 0.5 }, colors: ["#f59e0b", "#fcd34d", "#fff"] });
+    },
+  });
+
   return (
-    <div className="bg-zinc-900/60 border border-emerald-500/20 rounded-2xl p-5">
-      <div className="flex items-center gap-2 mb-3">
-        <DollarSign size={16} className="text-emerald-400" />
-        <span className="text-white font-bold text-sm">💡 Financial Tip of the Day</span>
+    <div className="border border-amber-500/20 bg-amber-950/10 rounded-2xl p-5">
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-amber-400 text-xl">💎</span>
+        <h2 className="text-white font-black text-lg">Complete Offers — Earn $1–$8 per task</h2>
       </div>
-      <p className="text-zinc-300 text-sm leading-relaxed">{tip}</p>
+      <p className="text-zinc-400 text-xs mb-4">Real tasks from real brands. Complete once, earn instantly. <span className="text-amber-400">Powered by TapJoy · Unity.</span></p>
+      {activeOffer && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-[9998]">
+          <div className="bg-zinc-900 border border-amber-500/30 rounded-2xl w-full max-w-sm p-6 text-center">
+            <div className="text-4xl mb-3">💎</div>
+            <h3 className="text-white font-bold text-lg mb-2">{activeOffer.title}</h3>
+            <div className="text-amber-400 font-black text-3xl mb-4">${(activeOffer.reward / 100).toFixed(2)}</div>
+            <p className="text-zinc-400 text-sm mb-5">This will open the offer in a new tab. Complete it and come back to claim your reward.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setActiveOffer(null)} className="flex-1 py-2.5 border border-white/10 text-zinc-400 rounded-xl text-sm hover:border-white/20 transition-colors">Cancel</button>
+              <button
+                onClick={() => {
+                  window.open("https://tapjoy.com", "_blank");
+                  setTimeout(() => completeMutation.mutate(activeOffer), 1500);
+                }}
+                disabled={completeMutation.isPending}
+                className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl text-sm transition-colors"
+              >
+                {completeMutation.isPending ? "Claiming..." : "Open & Claim →"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {(offersQuery.data ?? []).map((offer) => {
+          const claimed = claimedIds.includes(offer.id);
+          return (
+            <div key={offer.id} className={`border rounded-xl p-4 flex flex-col gap-2 transition-all ${claimed ? "border-amber-500/30 bg-amber-900/5 opacity-60" : "border-white/10 bg-zinc-900/60 hover:border-amber-500/30"}`}>
+              <div className="text-2xl">{offer.icon}</div>
+              <div className="text-white text-sm font-bold leading-snug">{offer.title}</div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-amber-400 font-black text-xl">${(offer.reward / 100).toFixed(2)}</span>
+                <span className="text-zinc-600 text-xs bg-zinc-800 px-2 py-0.5 rounded-full">{offer.timeEstimate}</span>
+              </div>
+              <button
+                onClick={() => !claimed && setActiveOffer({ id: offer.id, title: offer.title, reward: offer.reward })}
+                disabled={claimed}
+                className={`mt-auto py-2 rounded-lg text-xs font-bold transition-colors ${claimed ? "bg-zinc-700 text-zinc-500 cursor-not-allowed" : "bg-amber-500 hover:bg-amber-400 text-black"}`}
+              >
+                {claimed ? "✓ Claimed" : "Complete Offer"}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      <p className="text-zinc-700 text-[10px] mt-3">Live offer feed coming soon — current offers are demo placeholders from TapJoy categories.</p>
     </div>
   );
 }
 
+// ---- Pollfish Surveys Section ----
+function SurveysSection() {
+  const surveysQuery = useQuery({ queryKey: ["availableSurveys"], queryFn: () => rpc.getAvailableSurveys() });
+  const queryClient = useQueryClient();
+  const [claimedIds, setClaimedIds] = useState<string[]>([]);
+  const completeMutation = useMutation({
+    mutationFn: (s: { id: string; reward: number }) => rpc.completePollSurvey(s.id, s.reward),
+    onSuccess: (_, vars) => {
+      setClaimedIds((p) => [...p, vars.id]);
+      void queryClient.invalidateQueries({ queryKey: ["myEarnings"] });
+    },
+  });
+  return (
+    <div className="border border-blue-500/20 bg-blue-950/10 rounded-2xl p-5">
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-blue-400 text-xl">📋</span>
+        <h2 className="text-white font-black text-lg">Paid Surveys — Earn $0.75–$3.00 per survey</h2>
+      </div>
+      <p className="text-zinc-400 text-xs mb-4">Real market research surveys. Your opinion earns money. <span className="text-blue-400">Powered by Pollfish.</span></p>
+      <div className="flex flex-col gap-3">
+        {(surveysQuery.data ?? []).map((survey) => {
+          const claimed = claimedIds.includes(survey.id);
+          return (
+            <div key={survey.id} className={`border rounded-xl p-4 flex items-center gap-4 transition-all ${claimed ? "border-blue-500/20 opacity-60" : "border-white/10 bg-zinc-900/60 hover:border-blue-500/20"}`}>
+              <div className="text-2xl flex-shrink-0">{survey.icon}</div>
+              <div className="flex-1 min-w-0">
+                <div className="text-white font-bold text-sm">{survey.title}</div>
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                  <span className="text-zinc-500 text-xs bg-zinc-800 px-2 py-0.5 rounded-full">{survey.topic}</span>
+                  <span className="text-zinc-600 text-xs">{survey.length}</span>
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                <span className="text-blue-400 font-black text-xl">${(survey.reward / 100).toFixed(2)}</span>
+                <button
+                  onClick={() => {
+                    if (claimed || completeMutation.isPending) return;
+                    window.open("https://www.pollfish.com", "_blank");
+                    setTimeout(() => completeMutation.mutate({ id: survey.id, reward: survey.reward }), 1500);
+                  }}
+                  disabled={claimed || completeMutation.isPending}
+                  className={`py-1.5 px-4 rounded-lg text-xs font-bold transition-colors ${claimed ? "bg-zinc-700 text-zinc-500 cursor-not-allowed" : "bg-blue-500 hover:bg-blue-400 text-white"}`}
+                >
+                  {claimed ? "✓ Done" : "Take Survey"}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p className="text-zinc-700 text-[10px] mt-3">Live surveys powered by Pollfish coming soon. Current surveys are demo placeholders.</p>
+    </div>
+  );
+}
+
+// ---- Passive Income Section ----
+function PassiveIncomeSection() {
+  const [open, setOpen] = useState(false);
+  const [bgEarning, setBgEarning] = useState(() => localStorage.getItem("lack_bg_earning") === "1");
+  const [honeygainNotify, setHoneygainNotify] = useState(() => localStorage.getItem("lack_honeygain_notify") === "1");
+  const queryClient = useQueryClient();
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const adMutation = useMutation({
+    mutationFn: () => rpc.recordAdView("banner"),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["myEarnings"] }),
+  });
+  useEffect(() => {
+    if (bgEarning) {
+      intervalRef.current = setInterval(() => {
+        if (document.visibilityState === "visible") adMutation.mutate();
+      }, 60000);
+    }
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [bgEarning]);
+  function toggleBgEarning() {
+    const next = !bgEarning;
+    setBgEarning(next);
+    localStorage.setItem("lack_bg_earning", next ? "1" : "0");
+  }
+  return (
+    <div className="border border-purple-500/20 bg-purple-950/10 rounded-2xl overflow-hidden">
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition-colors">
+        <div className="flex items-center gap-2">
+          <span className="text-purple-400 text-xl">😴</span>
+          <span className="text-white font-black text-lg">Earn While You Sleep — Passive Income</span>
+        </div>
+        {open ? <ChevronUp size={18} className="text-zinc-400" /> : <ChevronDown size={18} className="text-zinc-400" />}
+      </button>
+      {open && (
+        <div className="px-5 pb-5 grid md:grid-cols-3 gap-4">
+          <div className="border border-purple-500/20 bg-zinc-900/60 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2"><Wifi size={16} className="text-purple-400" /><span className="text-white font-bold text-sm">Bandwidth Sharing</span></div>
+            <p className="text-zinc-400 text-xs mb-3">Share unused internet bandwidth. Earn $0.10–$1.00/day passively just by keeping LACK open.</p>
+            <p className="text-zinc-600 text-xs mb-3">Powered by Honeygain — coming soon</p>
+            <button onClick={() => { setHoneygainNotify(true); localStorage.setItem("lack_honeygain_notify", "1"); }} disabled={honeygainNotify}
+              className={`w-full py-2 rounded-lg text-xs font-bold transition-colors ${honeygainNotify ? "bg-zinc-700 text-zinc-400 cursor-not-allowed" : "bg-purple-500 hover:bg-purple-400 text-white"}`}>
+              {honeygainNotify ? "✓ You'll be notified" : "Notify Me When Live"}
+            </button>
+          </div>
+          <div className="border border-purple-500/20 bg-zinc-900/60 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2"><BarChart2 size={16} className="text-purple-400" /><span className="text-white font-bold text-sm">Background Ad Impressions</span></div>
+            <p className="text-zinc-400 text-xs mb-3">Keep LACK open in a tab. Earn passive ad impressions every 60 seconds automatically.</p>
+            <div className={`text-xs font-bold mb-3 ${bgEarning ? "text-emerald-400" : "text-zinc-500"}`}>{bgEarning ? "🟢 Background earning ON" : "⚫ Background earning OFF"}</div>
+            <button onClick={toggleBgEarning} className={`w-full py-2 rounded-lg text-xs font-bold transition-colors ${bgEarning ? "bg-zinc-700 hover:bg-zinc-600 text-white" : "bg-purple-500 hover:bg-purple-400 text-white"}`}>
+              {bgEarning ? "Turn Off" : "Enable Background Earning"}
+            </button>
+          </div>
+          <div className="border border-purple-500/20 bg-zinc-900/60 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2"><Shield size={16} className="text-purple-400" /><span className="text-white font-bold text-sm">Data Licensing</span></div>
+            <p className="text-zinc-400 text-xs mb-3">License your anonymized profile data to researchers. Earn $0.05–$0.50/month based on profile completeness.</p>
+            <p className="text-zinc-600 text-xs mb-3">Requires Level 2+ data consent</p>
+            <a href="/privacy" className="block w-full py-2 rounded-lg text-xs font-bold text-center bg-purple-500 hover:bg-purple-400 text-white transition-colors">Manage Data Consent →</a>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---- Finance Corner ----
+const FINANCE_TIPS = [
+  "Opening a high-yield savings account can earn 5x more interest than a standard account.",
+  "The 50/30/20 rule: 50% needs, 30% wants, 20% savings — even on a tight budget.",
+  "Checking your credit score is free and never hurts your credit rating.",
+  "SNAP benefits can be used at many farmers markets — often doubling your buying power.",
+  "Many utility companies offer low-income assistance programs — call and ask.",
+  "Gig work income qualifies for the Earned Income Tax Credit — worth up to $7,000.",
+  "Library cards give free access to job boards, e-learning, and business software.",
+  "Many banks offer second-chance checking accounts with no minimum balance.",
+  "Section 8 waitlists are open in many cities — apply even if the wait is long.",
+  "Most hospitals have charity care programs — medical debt can often be forgiven.",
+];
+function FinanceCorner() {
+  const tipIndex = Math.floor(Date.now() / (1000 * 60 * 60 * 24)) % FINANCE_TIPS.length;
+  const [reaction, setReaction] = useState<"up" | "down" | null>(null);
+  return (
+    <div className="border border-emerald-500/20 bg-emerald-950/10 rounded-2xl p-5">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-emerald-400 text-xl">💡</span>
+        <h2 className="text-white font-black text-lg">Finance Corner</h2>
+        <span className="text-xs text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded-full ml-auto">Financial content = premium ad rates</span>
+      </div>
+      <div className="flex gap-4 items-start">
+        <div className="flex-1 border border-emerald-500/20 bg-zinc-900/60 rounded-xl p-4">
+          <div className="text-zinc-400 text-xs font-bold uppercase tracking-wider mb-2">Tip of the Day</div>
+          <p className="text-white text-sm leading-relaxed mb-3">{FINANCE_TIPS[tipIndex]}</p>
+          <div className="flex items-center gap-3">
+            <span className="text-zinc-500 text-xs">Was this helpful?</span>
+            <button onClick={() => setReaction("up")} className={`text-sm transition-transform ${reaction === "up" ? "scale-125" : "hover:scale-110"}`}>👍</button>
+            <button onClick={() => setReaction("down")} className={`text-sm transition-transform ${reaction === "down" ? "scale-125" : "hover:scale-110"}`}>👎</button>
+            {reaction && <span className="text-zinc-500 text-xs">Thanks!</span>}
+          </div>
+        </div>
+        <div className="w-28 flex-shrink-0 hidden md:flex flex-col gap-1">
+          <AdSlot width={160} height={600} label="Finance Ad" className="h-28" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- Earnings Calculator ----
 function EarningsCalculator() {
   const [hours, setHours] = useState(2);
   const [effort, setEffort] = useState<"casual" | "active" | "hustling">("active");
   const [dataSharing, setDataSharing] = useState(false);
-
-  const base = 0.025 * 4 * hours;
-  const surveys = effort !== "casual" ? 1.50 * 3 * hours : 0;
-  const offers = effort === "hustling" ? 2.50 * 1 * hours : 0;
-  const passive = 0.10;
-  const multiplier = dataSharing ? 1.4 : 1;
-  const low = ((base + passive) * multiplier).toFixed(2);
-  const high = ((base + surveys + offers + passive) * multiplier).toFixed(2);
-
+  const loopsPerHour = 4;
+  const baseCents = loopsPerHour * 2.5 * hours;
+  const surveyBonus = effort !== "casual" ? 150 * 3 * hours : 0;
+  const offerBonus = effort === "hustling" ? 250 * 1 * hours : 0;
+  const dataMultiplier = dataSharing ? 1.4 : 1.0;
+  const totalCents = (baseCents + surveyBonus + offerBonus) * dataMultiplier;
+  const totalDollars = totalCents / 100;
+  const monthlyDollars = totalDollars * 30;
   return (
-    <div className="bg-zinc-900/60 border border-zinc-700/40 rounded-2xl p-5">
-      <h3 className="text-white font-bold mb-4 flex items-center gap-2">📊 How Much Can I Earn?</h3>
-      <div className="space-y-4">
-        <div>
-          <label className="text-zinc-400 text-xs mb-1 block">Hours per day: <span className="text-white font-bold">{hours}h</span></label>
-          <input type="range" min={0.5} max={8} step={0.5} value={hours} onChange={e => setHours(Number(e.target.value))} className="w-full accent-emerald-500" />
-        </div>
-        <div>
-          <label className="text-zinc-400 text-xs mb-2 block">Effort level:</label>
-          <div className="flex gap-2">
-            {(["casual", "active", "hustling"] as const).map(e => (
-              <button key={e} onClick={() => setEffort(e)} className={`flex-1 py-1.5 rounded-lg text-xs font-bold capitalize transition-colors ${effort === e ? "bg-emerald-500 text-black" : "bg-zinc-800 text-zinc-400"}`}>{e}</button>
-            ))}
+    <div className="border border-white/10 bg-zinc-900/60 rounded-2xl p-5">
+      <div className="flex items-center gap-2 mb-4">
+        <Calculator size={18} className="text-zinc-400" />
+        <h2 className="text-white font-black text-lg">How Much Can I Earn?</h2>
+      </div>
+      <div className="grid md:grid-cols-2 gap-6">
+        <div className="space-y-4">
+          <div>
+            <div className="flex justify-between mb-2"><label className="text-zinc-400 text-sm">Hours per day</label><span className="text-white font-bold text-sm">{hours}h</span></div>
+            <input type="range" min={0.5} max={8} step={0.5} value={hours} onChange={(e) => setHours(Number(e.target.value))} className="w-full accent-emerald-500" />
+            <div className="flex justify-between text-zinc-600 text-xs mt-1"><span>30 min</span><span>8 hrs</span></div>
           </div>
+          <div>
+            <label className="text-zinc-400 text-sm block mb-2">Effort level</label>
+            <div className="flex flex-col gap-2">
+              {([["casual", "Casual", "Ads only (The Grind)"], ["active", "Active", "Ads + surveys"], ["hustling", "Hustling", "All methods"]] as const).map(([val, label, sub]) => (
+                <button key={val} onClick={() => setEffort(val)} className={`py-2 px-3 rounded-xl text-sm text-left border transition-colors ${effort === val ? "border-emerald-500 bg-emerald-500/10 text-emerald-300" : "border-white/10 text-zinc-400 hover:border-white/20"}`}>
+                  <span className="font-bold">{label}</span> <span className="text-xs opacity-70">— {sub}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={dataSharing} onChange={(e) => setDataSharing(e.target.checked)} className="accent-emerald-500" />
+            <span className="text-zinc-400 text-xs">Data sharing enabled (+40% earnings boost)</span>
+          </label>
         </div>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" checked={dataSharing} onChange={e => setDataSharing(e.target.checked)} className="accent-emerald-500" />
-          <span className="text-zinc-400 text-xs">Data sharing enabled (+40% boost)</span>
-        </label>
-        <div className="bg-zinc-800/60 rounded-xl p-4 text-center">
-          <p className="text-zinc-400 text-xs mb-1">Estimated daily earnings</p>
-          <p className="text-emerald-400 text-2xl font-black">${low} – ${high}</p>
-          <p className="text-zinc-500 text-xs mt-1">${(Number(low) * 30).toFixed(0)}–${(Number(high) * 30).toFixed(0)}/month estimated</p>
+        <div className="bg-zinc-800/50 rounded-2xl p-5 flex flex-col justify-center">
+          <div className="text-zinc-400 text-xs uppercase tracking-widest mb-2">Estimated earnings</div>
+          <div className="text-emerald-400 font-black text-4xl font-mono">${totalDollars.toFixed(2)}<span className="text-zinc-500 text-base font-normal">/day</span></div>
+          <div className="text-zinc-300 font-bold text-xl mb-4">${monthlyDollars.toFixed(0)}<span className="text-zinc-500 text-sm font-normal">/month</span></div>
+          <div className="space-y-1.5 text-xs border-t border-white/10 pt-3">
+            <div className="flex justify-between"><span className="text-zinc-500">The Grind (ads)</span><span className="text-zinc-300">${(baseCents / 100).toFixed(2)}</span></div>
+            {surveyBonus > 0 && <div className="flex justify-between"><span className="text-zinc-500">Surveys</span><span className="text-zinc-300">${(surveyBonus / 100).toFixed(2)}</span></div>}
+            {offerBonus > 0 && <div className="flex justify-between"><span className="text-zinc-500">Offers</span><span className="text-zinc-300">${(offerBonus / 100).toFixed(2)}</span></div>}
+            {dataSharing && <div className="flex justify-between"><span className="text-zinc-500">Data bonus</span><span className="text-zinc-300">×1.4</span></div>}
+            <div className="border-t border-white/10 pt-1 flex justify-between font-bold"><span className="text-zinc-400">Total</span><span className="text-emerald-400">${totalDollars.toFixed(2)}/day</span></div>
+          </div>
+          <p className="text-zinc-600 text-[10px] mt-3">Estimates based on typical engagement. Actual earnings vary.</p>
         </div>
       </div>
-    </div>
-  );
-}
-
-function OfferwallSection() {
-  return (
-    <div className="bg-zinc-900/60 border border-amber-500/20 rounded-2xl p-6 text-center">
-      <div className="text-2xl mb-2">💎</div>
-      <h3 className="text-white font-bold mb-1">Complete Offers — Earn $1–$8 per task</h3>
-      <p className="text-zinc-400 text-sm">Download apps, sign up for services, and complete tasks for big rewards. Loading offers…</p>
-    </div>
-  );
-}
-
-function SurveysSection() {
-  return (
-    <div className="bg-zinc-900/60 border border-blue-500/20 rounded-2xl p-6 text-center">
-      <div className="text-2xl mb-2">📋</div>
-      <h3 className="text-white font-bold mb-1">Paid Surveys — Earn $0.75–$3.00 per survey</h3>
-      <p className="text-zinc-400 text-sm">Real market research surveys. 5–15 minutes each. Loading surveys…</p>
     </div>
   );
 }

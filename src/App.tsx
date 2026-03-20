@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, useLocation, Link } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
 import { NavBar } from "@/components/NavBar";
 import { FloatingChat } from "@/components/FloatingChat";
 import { HomePage } from "@/pages/HomePage";
@@ -10,6 +11,73 @@ import { HousingPage } from "@/pages/HousingPage";
 import { RestorationPage } from "@/pages/RestorationPage";
 import { AdminPage } from "@/pages/AdminPage";
 import { PrivacyPage } from "@/pages/PrivacyPage";
+
+// ---- Splash Screen ----
+// Plays the intro video once per session. On first-ever visit, also shows
+// a Picture-in-Picture corner video while the profile page loads.
+function SplashScreen({ onDone }: { onDone: () => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [fading, setFading] = useState(false);
+
+  useEffect(() => {
+    // Max wait 5s even if video doesn't end
+    const timeout = setTimeout(() => {
+      setFading(true);
+      setTimeout(onDone, 600);
+    }, 5000);
+    return () => clearTimeout(timeout);
+  }, [onDone]);
+
+  const handleEnded = () => {
+    setFading(true);
+    setTimeout(onDone, 600);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[99999] bg-zinc-950 flex items-center justify-center"
+      style={{ transition: "opacity 0.6s ease", opacity: fading ? 0 : 1 }}
+    >
+      <div className="flex flex-col items-center gap-6">
+        <video
+          ref={videoRef}
+          src="/lack-intro.mp4"
+          autoPlay
+          muted
+          playsInline
+          onEnded={handleEnded}
+          onError={handleEnded}
+          className="max-w-xs w-full rounded-2xl shadow-2xl"
+        />
+        <div className="text-zinc-600 text-xs animate-pulse">Loading LACK...</div>
+      </div>
+    </div>
+  );
+}
+
+// ---- Picture-in-picture intro video (corner) ----
+// Shows in bottom-right while user fills out profile for first time
+export function PipIntroVideo() {
+  const [visible, setVisible] = useState(true);
+  if (!visible) return null;
+  return (
+    <div className="fixed bottom-24 right-6 z-[9990] flex flex-col items-end gap-1">
+      <button
+        onClick={() => setVisible(false)}
+        className="text-zinc-500 hover:text-zinc-300 text-xs self-end mb-0.5"
+      >✕ close</button>
+      <video
+        src="/lack-intro.mp4"
+        autoPlay
+        muted
+        loop
+        playsInline
+        className="w-40 rounded-xl shadow-2xl border border-white/10"
+      />
+      <span className="text-zinc-600 text-[10px]">Welcome to LACK</span>
+    </div>
+  );
+}
 
 function SiteFooter() {
   return (
@@ -44,8 +112,39 @@ function SiteFooter() {
 function AppLayout() {
   const location = useLocation();
   const isAdmin = location.pathname.startsWith("/admin");
+
+  // Show splash once per session (not on admin pages)
+  const [showSplash, setShowSplash] = useState(() => {
+    if (isAdmin) return false;
+    return !sessionStorage.getItem("lack_splash_shown");
+  });
+
+  // Show PiP intro video on profile page if this is first ever visit
+  const isFirstEver = !localStorage.getItem("lack_visited");
+  const [showPip, setShowPip] = useState(false);
+
+  useEffect(() => {
+    if (!localStorage.getItem("lack_visited")) {
+      localStorage.setItem("lack_visited", "1");
+    }
+  }, []);
+
+  useEffect(() => {
+    // Show PiP on profile page for first-time visitors after splash
+    if (!showSplash && isFirstEver && location.pathname === "/profile") {
+      setShowPip(true);
+    }
+  }, [showSplash, location.pathname, isFirstEver]);
+
+  const handleSplashDone = () => {
+    sessionStorage.setItem("lack_splash_shown", "1");
+    setShowSplash(false);
+  };
+
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col">
+      {showSplash && !isAdmin && <SplashScreen onDone={handleSplashDone} />}
+      {showPip && <PipIntroVideo />}
       {!isAdmin && <NavBar />}
       <div className="flex-1">
         <Routes>
