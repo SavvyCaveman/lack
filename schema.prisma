@@ -17,10 +17,32 @@ model User {
   handle String?
 
   // Additional columns
-  applications       GigApplication[]
-  profile            UserProfile?
-  championedProjects RestorationProject[]
-  laborPledges       LaborPledge[]
+  applications        GigApplication[]
+  profile             UserProfile?
+  championedProjects  RestorationProject[]
+  laborPledges        LaborPledge[]
+  ratingsGiven        Rating[]             @relation("RatingsGiven")
+  ratingsReceived     Rating[]             @relation("RatingsReceived")
+  reportsMade         Report[]             @relation("ReportsMade")
+  blocksMade          Block[]              @relation("BlocksMade")
+  blocksReceived      Block[]              @relation("BlocksReceived")
+  conversationsAsUser1 Conversation[]     @relation("ConversationsAsUser1")
+  conversationsAsUser2 Conversation[]     @relation("ConversationsAsUser2")
+  messagesSent        Message[]            @relation("MessagesSent")
+  verifications       UserVerification[]
+}
+
+model UserVerification {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  method      String    // "email" | "phone" | "google" | "meta" | "twitter" | "linkedin" | "indeed" | "community" | "biometric"
+  verified    Boolean   @default(false)
+  verifiedAt  DateTime?
+  metadata    String    @default("") // JSON: stores handle/name from social, etc.
+  createdAt   DateTime  @default(now())
+
+  @@unique([userId, method])
 }
 
 model HousingListing {
@@ -77,6 +99,59 @@ model LaborPledge {
   skill     String
   hours     Int
   createdAt DateTime           @default(now())
+}
+
+model Rating {
+  id         String   @id @default(cuid())
+  fromUserId String
+  fromUser   User     @relation("RatingsGiven", fields: [fromUserId], references: [id])
+  toUserId   String
+  toUser     User     @relation("RatingsReceived", fields: [toUserId], references: [id])
+  gigId      String?
+  score      Int
+  comment    String   @default("")
+  createdAt  DateTime @default(now())
+}
+
+model Report {
+  id              String   @id @default(cuid())
+  reporterId      String
+  reporter        User     @relation("ReportsMade", fields: [reporterId], references: [id])
+  targetUserId    String?
+  targetListingId String?
+  reason          String
+  createdAt       DateTime @default(now())
+}
+
+model Block {
+  id        String   @id @default(cuid())
+  blockerId String
+  blocker   User     @relation("BlocksMade", fields: [blockerId], references: [id])
+  blockedId String
+  blocked   User     @relation("BlocksReceived", fields: [blockedId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model Conversation {
+  id           String    @id @default(cuid())
+  participant1 String
+  user1        User      @relation("ConversationsAsUser1", fields: [participant1], references: [id])
+  participant2 String
+  user2        User      @relation("ConversationsAsUser2", fields: [participant2], references: [id])
+  messages     Message[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  senderId       String
+  sender         User         @relation("MessagesSent", fields: [senderId], references: [id])
+  content        String
+  read           Boolean      @default(false)
+  createdAt      DateTime     @default(now())
 }
 
 model GigListing {

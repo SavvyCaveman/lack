@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { client } from "@/lib/client";
-import { MapPin, DollarSign, Clock, Plus, Briefcase } from "lucide-react";
+import { MapPin, DollarSign, Clock, Plus, Briefcase, MessageCircle, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { openChatWithUser } from "@/lib/chat";
 
 type Gig = {
   id: string;
@@ -38,16 +39,38 @@ function getCategoryColor(cat: string) {
   return categoryColors[cat] ?? "bg-zinc-500/20 text-zinc-400 border-zinc-500/30";
 }
 
-function GigCard({ gig, onApply }: { gig: Gig; onApply: (gig: Gig) => void }) {
+function GigCard({ gig, onApply, onReport }: { gig: Gig; onApply: (gig: Gig) => void; onReport: (gigId: string) => void }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
-    <div className="bg-zinc-900/60 border border-white/10 hover:border-emerald-500/30 rounded-xl p-4 flex flex-col gap-3 transition-colors">
+    <div className="bg-zinc-900/60 border border-white/10 hover:border-emerald-500/30 rounded-xl p-4 flex flex-col gap-3 transition-colors relative">
       <div className="flex items-start justify-between gap-2">
         <h3 className="font-bold text-white text-sm leading-tight">{gig.title}</h3>
-        <span
-          className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex-shrink-0 ${getCategoryColor(gig.category)}`}
-        >
-          {gig.category}
-        </span>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <span
+            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getCategoryColor(gig.category)}`}
+          >
+            {gig.category}
+          </span>
+          <div className="relative">
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="text-zinc-500 hover:text-zinc-300 p-0.5 rounded"
+            >
+              <MoreHorizontal size={14} />
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 top-6 bg-zinc-800 border border-white/10 rounded-lg shadow-xl z-10 min-w-[140px]">
+                <button
+                  onClick={() => { onReport(gig.id); setMenuOpen(false); }}
+                  className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-zinc-700 rounded-lg"
+                >
+                  🚩 Report listing
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2 text-xs text-zinc-400">
@@ -67,17 +90,27 @@ function GigCard({ gig, onApply }: { gig: Gig; onApply: (gig: Gig) => void }) {
 
       <p className="text-zinc-400 text-xs leading-relaxed line-clamp-3">{gig.description}</p>
 
-      <div className="flex items-center justify-between mt-auto pt-1">
-        <span className="text-xs text-zinc-600">
-          {gig._count.applications} applied · Posted by {gig.posterName}
+      <div className="flex items-center justify-between mt-auto pt-1 gap-2">
+        <span className="text-xs text-zinc-600 truncate">
+          {gig._count.applications} applied · {gig.posterName}
         </span>
-        <Button
-          size="sm"
-          onClick={() => onApply(gig)}
-          className="bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs h-7 px-3"
-        >
-          Apply
-        </Button>
+        <div className="flex gap-1.5 flex-shrink-0">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => openChatWithUser(gig.posterEmail, gig.posterName)}
+            className="border-white/10 text-zinc-400 hover:text-white h-7 px-2 gap-1"
+          >
+            <MessageCircle size={11} />
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => onApply(gig)}
+            className="bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs h-7 px-3"
+          >
+            Apply
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -206,9 +239,25 @@ function ApplyModal({ gig, onClose }: { gig: Gig | null; onClose: () => void }) 
     mutationFn: () => client.applyToGig(gig!.id, message),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["gigs"] });
-      toast.success("Application submitted! You'll hear back soon.");
       onClose();
       setMessage("");
+      // Share nudge
+      toast.success(
+        <div className="flex flex-col gap-2">
+          <span className="font-bold">Application submitted! 🎉</span>
+          <span className="text-xs text-zinc-400">Know someone who needs work? Share LACK with them.</span>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText("https://lack-techoverride243923380.adaptive.ai");
+              toast.success("Link copied!");
+            }}
+            className="text-left text-xs text-emerald-400 hover:underline"
+          >
+            📋 Copy LACK link
+          </button>
+        </div>,
+        { duration: 6000 }
+      );
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -252,6 +301,12 @@ export function GigsPage() {
   const [category, setCategory] = useState("All");
   const [postOpen, setPostOpen] = useState(false);
   const [applyGig, setApplyGig] = useState<Gig | null>(null);
+
+  const reportMutation = useMutation({
+    mutationFn: (gigId: string) => client.reportListing(gigId, "Reported by user"),
+    onSuccess: () => toast.success("Listing reported. We'll review it shortly."),
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const { data: gigs = [], isLoading } = useQuery({
     queryKey: ["gigs", false],
@@ -328,7 +383,7 @@ export function GigsPage() {
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered.map((gig) => (
-              <GigCard key={gig.id} gig={gig} onApply={setApplyGig} />
+              <GigCard key={gig.id} gig={gig} onApply={setApplyGig} onReport={(id) => reportMutation.mutate(id)} />
             ))}
           </div>
         )}

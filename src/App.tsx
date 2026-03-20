@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { NavBar } from "@/components/NavBar";
+import { FloatingChat } from "@/components/FloatingChat";
 import { HomePage } from "@/pages/HomePage";
 import { EarnPage } from "@/pages/EarnPage";
 import { GigsPage } from "@/pages/GigsPage";
@@ -22,6 +23,7 @@ function App() {
           <Route path="/housing/restore" element={<RestorationPage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Routes>
+        <FloatingChat />
       </div>
     </BrowserRouter>
   );

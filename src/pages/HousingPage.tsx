@@ -18,7 +18,9 @@ import {
   CheckCircle2,
   Info,
   ExternalLink,
+  MessageCircle,
 } from "lucide-react";
+import { openChatWithUser } from "@/lib/chat";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -376,12 +378,21 @@ function PropertyCard({ listing }: { listing: HousingListing }) {
           <span className="text-xs text-zinc-500">
             3% LACK fee · No hidden costs
           </span>
-          <button
-            onClick={() => setShowContact(!showContact)}
-            className="bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
-          >
-            Contact
-          </button>
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => openChatWithUser(listing.contactEmail, listing.contactName)}
+              className="border border-white/10 text-zinc-400 hover:text-white text-xs px-2 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+              title="Message poster"
+            >
+              <MessageCircle size={12} />
+            </button>
+            <button
+              onClick={() => setShowContact(!showContact)}
+              className="bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
+            >
+              Contact
+            </button>
+          </div>
         </div>
 
         {showContact && (

@@ -506,6 +506,300 @@ export async function seedHousing() {
   return { seeded: true };
 }
 
+// ---- Ratings ----
+
+export async function rateUser(
+  toUserId: string,
+  score: number,
+  comment: string,
+  gigId?: string,
+) {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+
+  if (userId === toUserId) throw new Error("You cannot rate yourself");
+  if (score < 1 || score > 5) throw new Error("Score must be between 1 and 5");
+
+  await db.user.upsert({
+    where: { id: userId },
+    create: { id: userId },
+    update: {},
+  });
+
+  // Ensure target user exists
+  const target = await db.user.findUnique({ where: { id: toUserId } });
+  if (!target) throw new Error("User not found");
+
+  return await db.rating.create({
+    data: { fromUserId: userId, toUserId, score, comment, gigId },
+  });
+}
+
+export async function getUserRatings(userId: string) {
+  const ratings = await db.rating.findMany({
+    where: { toUserId: userId },
+    include: {
+      fromUser: { select: { id: true, name: true, handle: true, image: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const avg =
+    ratings.length > 0
+      ? ratings.reduce((sum, r) => sum + r.score, 0) / ratings.length
+      : null;
+
+  return { ratings, average: avg, count: ratings.length };
+}
+
+// ---- Report & Block ----
+
+export async function reportUser(targetUserId: string, reason: string) {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+
+  await db.user.upsert({
+    where: { id: userId },
+    create: { id: userId },
+    update: {},
+  });
+
+  return await db.report.create({
+    data: { reporterId: userId, targetUserId, reason },
+  });
+}
+
+export async function reportListing(targetListingId: string, reason: string) {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+
+  await db.user.upsert({
+    where: { id: userId },
+    create: { id: userId },
+    update: {},
+  });
+
+  return await db.report.create({
+    data: { reporterId: userId, targetListingId, reason },
+  });
+}
+
+export async function blockUser(blockedId: string) {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+
+  if (userId === blockedId) throw new Error("You cannot block yourself");
+
+  await db.user.upsert({
+    where: { id: userId },
+    create: { id: userId },
+    update: {},
+  });
+
+  const existing = await db.block.findFirst({
+    where: { blockerId: userId, blockedId },
+  });
+  if (existing) return existing;
+
+  return await db.block.create({
+    data: { blockerId: userId, blockedId },
+  });
+}
+
+export async function getBlockedUsers() {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+
+  const blocks = await db.block.findMany({
+    where: { blockerId: userId },
+    select: { blockedId: true },
+  });
+
+  return blocks.map((b) => b.blockedId);
+}
+
+// ---- Messaging ----
+
+export async function getOrCreateConversation(otherUserId: string) {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+
+  if (userId === otherUserId) throw new Error("Cannot message yourself");
+
+  await db.user.upsert({
+    where: { id: userId },
+    create: { id: userId },
+    update: {},
+  });
+
+  // Ensure other user exists (create stub if needed)
+  await db.user.upsert({
+    where: { id: otherUserId },
+    create: { id: otherUserId },
+    update: {},
+  });
+
+  // Check both orderings
+  const existing = await db.conversation.findFirst({
+    where: {
+      OR: [
+        { participant1: userId, participant2: otherUserId },
+        { participant1: otherUserId, participant2: userId },
+      ],
+    },
+    include: {
+      user1: { select: { id: true, name: true, handle: true, image: true } },
+      user2: { select: { id: true, name: true, handle: true, image: true } },
+    },
+  });
+
+  if (existing) return existing;
+
+  return await db.conversation.create({
+    data: { participant1: userId, participant2: otherUserId },
+    include: {
+      user1: { select: { id: true, name: true, handle: true, image: true } },
+      user2: { select: { id: true, name: true, handle: true, image: true } },
+    },
+  });
+}
+
+export async function getConversations() {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+
+  await db.user.upsert({
+    where: { id: userId },
+    create: { id: userId },
+    update: {},
+  });
+
+  const convos = await db.conversation.findMany({
+    where: {
+      OR: [{ participant1: userId }, { participant2: userId }],
+    },
+    include: {
+      user1: { select: { id: true, name: true, handle: true, image: true } },
+      user2: { select: { id: true, name: true, handle: true, image: true } },
+      messages: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
+    },
+    orderBy: { updatedAt: "desc" },
+  });
+
+  return convos.map((c) => {
+    const otherUser = c.participant1 === userId ? c.user2 : c.user1;
+    const lastMessage = c.messages[0] ?? null;
+    const unreadCount = 0; // Simplified - real count done in getUnreadCount
+    return {
+      id: c.id,
+      otherUser,
+      lastMessage,
+      unreadCount,
+      updatedAt: c.updatedAt,
+    };
+  });
+}
+
+export async function getMessages(conversationId: string) {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+
+  const convo = await db.conversation.findUnique({
+    where: { id: conversationId },
+  });
+  if (!convo) throw new Error("Conversation not found");
+  if (convo.participant1 !== userId && convo.participant2 !== userId) {
+    throw new Error("Not authorized");
+  }
+
+  return await db.message.findMany({
+    where: { conversationId },
+    include: {
+      sender: { select: { id: true, name: true, handle: true, image: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+}
+
+export async function sendMessage(conversationId: string, content: string) {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+
+  const convo = await db.conversation.findUnique({
+    where: { id: conversationId },
+  });
+  if (!convo) throw new Error("Conversation not found");
+  if (convo.participant1 !== userId && convo.participant2 !== userId) {
+    throw new Error("Not authorized");
+  }
+
+  const msg = await db.message.create({
+    data: { conversationId, senderId: userId, content },
+    include: {
+      sender: { select: { id: true, name: true, handle: true, image: true } },
+    },
+  });
+
+  // Update conversation updatedAt
+  await db.conversation.update({
+    where: { id: conversationId },
+    data: { updatedAt: new Date() },
+  });
+
+  return msg;
+}
+
+export async function markMessagesRead(conversationId: string) {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+
+  await db.message.updateMany({
+    where: {
+      conversationId,
+      senderId: { not: userId },
+      read: false,
+    },
+    data: { read: true },
+  });
+
+  return { success: true };
+}
+
+export async function getUnreadCount() {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+
+  await db.user.upsert({
+    where: { id: userId },
+    create: { id: userId },
+    update: {},
+  });
+
+  // Get all conversations the user is part of
+  const convos = await db.conversation.findMany({
+    where: {
+      OR: [{ participant1: userId }, { participant2: userId }],
+    },
+    select: { id: true },
+  });
+
+  const convoIds = convos.map((c) => c.id);
+  if (convoIds.length === 0) return { count: 0 };
+
+  const count = await db.message.count({
+    where: {
+      conversationId: { in: convoIds },
+      senderId: { not: userId },
+      read: false,
+    },
+  });
+
+  return { count };
+}
+
 // ---- Seed Data ----
 
 export async function seedGigs() {

@@ -273,6 +273,133 @@ export declare function seedHousing(): Promise<{
 	seeded: boolean;
 	message?: undefined;
 }>;
+export declare function rateUser(toUserId: string, score: number, comment: string, gigId?: string): Promise<{
+	id: string;
+	createdAt: Date;
+	gigId: string | null;
+	fromUserId: string;
+	toUserId: string;
+	score: number;
+	comment: string;
+}>;
+export declare function getUserRatings(userId: string): Promise<{
+	ratings: ({
+		fromUser: {
+			id: string;
+			name: string | null;
+			image: string | null;
+			handle: string | null;
+		};
+	} & {
+		id: string;
+		createdAt: Date;
+		gigId: string | null;
+		fromUserId: string;
+		toUserId: string;
+		score: number;
+		comment: string;
+	})[];
+	average: number | null;
+	count: number;
+}>;
+export declare function reportUser(targetUserId: string, reason: string): Promise<{
+	id: string;
+	createdAt: Date;
+	reporterId: string;
+	targetUserId: string | null;
+	targetListingId: string | null;
+	reason: string;
+}>;
+export declare function reportListing(targetListingId: string, reason: string): Promise<{
+	id: string;
+	createdAt: Date;
+	reporterId: string;
+	targetUserId: string | null;
+	targetListingId: string | null;
+	reason: string;
+}>;
+export declare function blockUser(blockedId: string): Promise<{
+	id: string;
+	createdAt: Date;
+	blockerId: string;
+	blockedId: string;
+}>;
+export declare function getBlockedUsers(): Promise<string[]>;
+export declare function getOrCreateConversation(otherUserId: string): Promise<{
+	user1: {
+		id: string;
+		name: string | null;
+		image: string | null;
+		handle: string | null;
+	};
+	user2: {
+		id: string;
+		name: string | null;
+		image: string | null;
+		handle: string | null;
+	};
+} & {
+	id: string;
+	createdAt: Date;
+	updatedAt: Date;
+	participant1: string;
+	participant2: string;
+}>;
+export declare function getConversations(): Promise<{
+	id: string;
+	otherUser: {
+		id: string;
+		name: string | null;
+		image: string | null;
+		handle: string | null;
+	};
+	lastMessage: {
+		id: string;
+		createdAt: Date;
+		content: string;
+		conversationId: string;
+		senderId: string;
+		read: boolean;
+	};
+	unreadCount: number;
+	updatedAt: Date;
+}[]>;
+export declare function getMessages(conversationId: string): Promise<({
+	sender: {
+		id: string;
+		name: string | null;
+		image: string | null;
+		handle: string | null;
+	};
+} & {
+	id: string;
+	createdAt: Date;
+	content: string;
+	conversationId: string;
+	senderId: string;
+	read: boolean;
+})[]>;
+export declare function sendMessage(conversationId: string, content: string): Promise<{
+	sender: {
+		id: string;
+		name: string | null;
+		image: string | null;
+		handle: string | null;
+	};
+} & {
+	id: string;
+	createdAt: Date;
+	content: string;
+	conversationId: string;
+	senderId: string;
+	read: boolean;
+}>;
+export declare function markMessagesRead(conversationId: string): Promise<{
+	success: boolean;
+}>;
+export declare function getUnreadCount(): Promise<{
+	count: number;
+}>;
 export declare function seedGigs(): Promise<{
 	seeded: boolean;
 	message: string;

@@ -24,6 +24,11 @@
 - **RestorationProject**: Address, city, status, proposed use, funding goal/raised, backer count, champion, description
 - **RestorationUpdate**: Progress updates posted by project champions
 - **LaborPledge**: User skill/hours pledges to restoration projects
+- **Rating**: Mutual user ratings (1-5 stars with comment) — workers rate employers and vice versa
+- **Report**: Reports on users or listings for moderation
+- **Block**: User-to-user blocks
+- **Conversation**: DM threads between two users
+- **Message**: Individual messages in a conversation, with read status
 
 ## Functions (RPC Endpoints)
 
@@ -43,6 +48,18 @@
 - `pledgeLabor(projectId, skill, hours)`: Pledge labor to a project (requires auth)
 - `addRestorationUpdate(projectId, content)`: Post a project update (champion only, requires auth)
 - `seedHousing()`: Seed 7 housing listings + 3 restoration projects (no-op if already seeded)
+- `rateUser(toUserId, score, comment, gigId?)`: Submit a mutual rating (requires auth, 1-5 stars)
+- `getUserRatings(userId)`: Get all ratings for a user with average score
+- `reportUser(targetUserId, reason)`: Report a user (requires auth)
+- `reportListing(targetListingId, reason)`: Report a listing (requires auth)
+- `blockUser(blockedId)`: Block a user (requires auth)
+- `getBlockedUsers()`: Get list of blocked user IDs for current user (requires auth)
+- `getOrCreateConversation(otherUserId)`: Get or create a DM conversation (requires auth)
+- `getConversations()`: List all conversations for current user with last message preview (requires auth)
+- `getMessages(conversationId)`: Get all messages in a conversation (requires auth)
+- `sendMessage(conversationId, content)`: Send a message (requires auth)
+- `markMessagesRead(conversationId)`: Mark all messages in a conversation as read (requires auth)
+- `getUnreadCount()`: Get total unread message count for current user (requires auth)
 
 ## Ad Integration Notes
 
@@ -75,3 +92,6 @@ The Community Restoration Hub has Stripe payment UI ready but uses a placeholder
 - Someone wanting a full-time job with salary help → /careers
 - Someone looking for affordable rent with no hidden fees → /housing
 - Community organizer wanting to restore an abandoned building → /housing/restore
+- Users messaging gig posters or housing listers directly → FloatingChat (bottom-right on all pages)
+- Employers rating workers after a job → rateUser()
+- Users reporting a suspicious listing → ⋯ menu on gig cards
