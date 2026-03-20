@@ -1,7 +1,7 @@
 {
   "name": "full-stack-app-template",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.2.0",
   "type": "module",
   "scripts": {
     "dev:vite": "vite --host 0.0.0.0 2>&1 | tee -a vite-dev.log",
@@ -79,6 +79,7 @@
     "react-dom": "^19.1.0",
     "react-hook-form": "^7.60.0",
     "react-resizable-panels": "^3.0.3",
+    "react-router-dom": "^7.13.1",
     "recharts": "^2.15.4",
     "sonner": "^2.0.6",
     "superjson": "^2.2.2",
@@ -89,9 +90,9 @@
     "zod": "^4.0.5"
   },
   "peerDependencies": {
-    "openai": "~4.42.0",
     "@trpc/client": "^10.11.0",
-    "@trpc/server": "^10.11.0"
+    "@trpc/server": "^10.11.0",
+    "openai": "~4.42.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",

@@ -16,5 +16,44 @@ model User {
   image  String?
   handle String?
 
-  // Additional columns can be added here
+  // Additional columns
+  applications GigApplication[]
+  profile      UserProfile?
+}
+
+model GigListing {
+  id           String           @id @default(cuid())
+  title        String
+  category     String
+  payRate      String
+  location     String
+  description  String
+  posterName   String
+  posterEmail  String
+  isCareer     Boolean          @default(false)
+  createdAt    DateTime         @default(now())
+  applications GigApplication[]
+}
+
+model GigApplication {
+  id        String     @id @default(cuid())
+  gigId     String
+  gig       GigListing @relation(fields: [gigId], references: [id])
+  userId    String
+  user      User       @relation(fields: [userId], references: [id])
+  message   String
+  createdAt DateTime   @default(now())
+}
+
+model UserProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id])
+  bio         String   @default("")
+  skills      String   @default("")
+  workHistory String   @default("")
+  phone       String   @default("")
+  location    String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
