@@ -17,8 +17,66 @@ model User {
   handle String?
 
   // Additional columns
-  applications GigApplication[]
-  profile      UserProfile?
+  applications       GigApplication[]
+  profile            UserProfile?
+  championedProjects RestorationProject[]
+  laborPledges       LaborPledge[]
+}
+
+model HousingListing {
+  id            String   @id @default(cuid())
+  type          String   // "rent" | "sale"
+  propertyType  String   // "apartment" | "house" | "room" | "commercial"
+  price         Float
+  address       String
+  neighborhood  String   @default("")
+  bedrooms      Int      @default(0)
+  bathrooms     Float    @default(1)
+  sqft          Int      @default(0)
+  description   String
+  utilitiesIncl Boolean  @default(false)
+  petFriendly   Boolean  @default(false)
+  parking       Boolean  @default(false)
+  contactName   String
+  contactEmail  String
+  createdAt     DateTime @default(now())
+}
+
+model RestorationProject {
+  id            String             @id @default(cuid())
+  address       String
+  city          String
+  status        String             // "foreclosed" | "abandoned" | "auction" | "tax_lien"
+  proposedUse   String             // "housing" | "community" | "mixed"
+  estimatedCost Float
+  fundingGoal   Float
+  amountRaised  Float              @default(0)
+  backerCount   Int                @default(0)
+  championId    String
+  champion      User               @relation(fields: [championId], references: [id])
+  description   String
+  updates       RestorationUpdate[]
+  laborPledges  LaborPledge[]
+  createdAt     DateTime           @default(now())
+}
+
+model RestorationUpdate {
+  id        String             @id @default(cuid())
+  projectId String
+  project   RestorationProject @relation(fields: [projectId], references: [id])
+  content   String
+  createdAt DateTime           @default(now())
+}
+
+model LaborPledge {
+  id        String             @id @default(cuid())
+  projectId String
+  project   RestorationProject @relation(fields: [projectId], references: [id])
+  userId    String
+  user      User               @relation(fields: [userId], references: [id])
+  skill     String
+  hours     Int
+  createdAt DateTime           @default(now())
 }
 
 model GigListing {

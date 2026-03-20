@@ -115,6 +115,164 @@ export declare function upsertProfile(data: {
 	phone: string;
 	updatedAt: Date;
 }>;
+export declare function getHousingListings(type?: string, maxPrice?: number, minBedrooms?: number): Promise<{
+	type: string;
+	id: string;
+	description: string;
+	createdAt: Date;
+	propertyType: string;
+	price: number;
+	address: string;
+	neighborhood: string;
+	bedrooms: number;
+	bathrooms: number;
+	sqft: number;
+	utilitiesIncl: boolean;
+	petFriendly: boolean;
+	parking: boolean;
+	contactName: string;
+	contactEmail: string;
+}[]>;
+export declare function createHousingListing(data: {
+	type: string;
+	propertyType: string;
+	price: number;
+	address: string;
+	neighborhood?: string;
+	bedrooms?: number;
+	bathrooms?: number;
+	sqft?: number;
+	description: string;
+	utilitiesIncl?: boolean;
+	petFriendly?: boolean;
+	parking?: boolean;
+	contactName: string;
+	contactEmail: string;
+}): Promise<{
+	type: string;
+	id: string;
+	description: string;
+	createdAt: Date;
+	propertyType: string;
+	price: number;
+	address: string;
+	neighborhood: string;
+	bedrooms: number;
+	bathrooms: number;
+	sqft: number;
+	utilitiesIncl: boolean;
+	petFriendly: boolean;
+	parking: boolean;
+	contactName: string;
+	contactEmail: string;
+}>;
+export declare function getRestorationProjects(): Promise<({
+	_count: {
+		laborPledges: number;
+		updates: number;
+	};
+	champion: {
+		id: string;
+		name: string | null;
+		handle: string | null;
+	};
+} & {
+	id: string;
+	description: string;
+	createdAt: Date;
+	address: string;
+	city: string;
+	status: string;
+	proposedUse: string;
+	estimatedCost: number;
+	fundingGoal: number;
+	amountRaised: number;
+	backerCount: number;
+	championId: string;
+})[]>;
+export declare function getRestorationProject(id: string): Promise<({
+	laborPledges: ({
+		user: {
+			id: string;
+			name: string | null;
+			handle: string | null;
+		};
+	} & {
+		id: string;
+		createdAt: Date;
+		userId: string;
+		projectId: string;
+		skill: string;
+		hours: number;
+	})[];
+	champion: {
+		id: string;
+		name: string | null;
+		handle: string | null;
+	};
+	updates: {
+		id: string;
+		createdAt: Date;
+		projectId: string;
+		content: string;
+	}[];
+} & {
+	id: string;
+	description: string;
+	createdAt: Date;
+	address: string;
+	city: string;
+	status: string;
+	proposedUse: string;
+	estimatedCost: number;
+	fundingGoal: number;
+	amountRaised: number;
+	backerCount: number;
+	championId: string;
+}) | null>;
+export declare function createRestorationProject(data: {
+	address: string;
+	city: string;
+	status: string;
+	proposedUse: string;
+	estimatedCost: number;
+	fundingGoal: number;
+	description: string;
+}): Promise<{
+	id: string;
+	description: string;
+	createdAt: Date;
+	address: string;
+	city: string;
+	status: string;
+	proposedUse: string;
+	estimatedCost: number;
+	fundingGoal: number;
+	amountRaised: number;
+	backerCount: number;
+	championId: string;
+}>;
+export declare function pledgeLabor(projectId: string, skill: string, hours: number): Promise<{
+	id: string;
+	createdAt: Date;
+	userId: string;
+	projectId: string;
+	skill: string;
+	hours: number;
+}>;
+export declare function addRestorationUpdate(projectId: string, content: string): Promise<{
+	id: string;
+	createdAt: Date;
+	projectId: string;
+	content: string;
+}>;
+export declare function seedHousing(): Promise<{
+	seeded: boolean;
+	message: string;
+} | {
+	seeded: boolean;
+	message?: undefined;
+}>;
 export declare function seedGigs(): Promise<{
 	seeded: boolean;
 	message: string;

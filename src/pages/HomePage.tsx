@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { DollarSign, Briefcase, Award, ArrowRight, Zap, Users, TrendingUp } from "lucide-react";
+import { DollarSign, Briefcase, Award, ArrowRight, Zap, Users, TrendingUp, Home } from "lucide-react";
 
 const sections = [
   {
@@ -40,6 +40,19 @@ const sections = [
     desc: "LACK negotiates your salary so you get more. We place you in full-time positions and skim the difference — so it costs you nothing.",
     cta: "Get Placed",
     ctaColor: "bg-purple-500 hover:bg-purple-400 text-white",
+  },
+  {
+    to: "/housing",
+    icon: Home,
+    iconBg: "bg-amber-500/20",
+    iconColor: "text-amber-400",
+    borderColor: "border-amber-500/30 hover:border-amber-400/60",
+    badge: "3% FEE",
+    badgeColor: "bg-amber-500/20 text-amber-400",
+    title: "Housing & Real Estate",
+    desc: "Rentals, home sales, tenant rights tools, and a community restoration hub to reclaim abandoned buildings as housing.",
+    cta: "Find Housing",
+    ctaColor: "bg-amber-500 hover:bg-amber-400 text-black",
   },
 ];
 
@@ -112,9 +125,9 @@ export function HomePage() {
       {/* Section cards */}
       <div className="max-w-4xl mx-auto px-4 py-12">
         <h2 className="text-xl font-bold text-white mb-6 text-center">
-          Three ways to earn
+          Four ways to get ahead
         </h2>
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
           {sections.map(
             ({
               to,

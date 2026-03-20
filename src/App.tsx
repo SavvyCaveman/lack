@@ -5,6 +5,8 @@ import { EarnPage } from "@/pages/EarnPage";
 import { GigsPage } from "@/pages/GigsPage";
 import { CareersPage } from "@/pages/CareersPage";
 import { ProfilePage } from "@/pages/ProfilePage";
+import { HousingPage } from "@/pages/HousingPage";
+import { RestorationPage } from "@/pages/RestorationPage";
 
 function App() {
   return (
@@ -16,6 +18,8 @@ function App() {
           <Route path="/earn" element={<EarnPage />} />
           <Route path="/gigs" element={<GigsPage />} />
           <Route path="/careers" element={<CareersPage />} />
+          <Route path="/housing" element={<HousingPage />} />
+          <Route path="/housing/restore" element={<RestorationPage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Routes>
       </div>

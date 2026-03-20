@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { DollarSign, Briefcase, Award, User, Menu, X } from "lucide-react";
+import { DollarSign, Briefcase, Award, User, Menu, X, Home } from "lucide-react";
 import { useState } from "react";
 
 const navItems = [
@@ -7,6 +7,7 @@ const navItems = [
   { to: "/earn", label: "Earn Now", icon: DollarSign },
   { to: "/gigs", label: "Gig Board", icon: Briefcase },
   { to: "/careers", label: "Careers", icon: Award },
+  { to: "/housing", label: "Housing", icon: Home },
   { to: "/profile", label: "My Profile", icon: User },
 ];
 
