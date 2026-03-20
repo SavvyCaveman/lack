@@ -8,12 +8,12 @@
 
 ## What It Does
 
-- **Earn Now** (`/earn`): Dense grid of 28+ Google AdSense-ready ad slots (leaderboards, medium rectangles, mobile banners, skyscrapers) — plug in real AdSense credentials to activate revenue. Also includes a recycling opportunities section with estimated cash values and links to local recyclers.
+- **Earn Now** (`/earn`): Full ad-revenue share system — 75% to users, 25% to LACK. Live earnings balance display, Cash Out button (Cash App or direct deposit, $1 minimum). Privacy opt-in tiers (3 levels, each earns welcome bonuses: +$0.10/$0.25/$0.50). THE JOURNEY button — 8-step sequence with interstitial ads and elective video selection (choose 1 of 4 themes: News, Entertainment, How-To, Local Interest). 28+ Google AdSense-ready ad slots (tap to earn). Recycling cash value guide. Privacy Policy page at `/privacy`.
 - **Gig Board** (`/gigs`): Local odd job listings (landscaping, carpentry, courier, snow removal, electronics, maintenance) with category filters, apply modal, and "Post a Gig" form. 10 seeded sample gigs.
 - **Career Placement** (`/careers`): Full-time job listings with LACK salary negotiation pitch. 4 seeded career listings.
 - **Housing & Real Estate** (`/housing`): Property listings for rent and sale with 3% LACK commission. Transparency Tools tab with tenant rights, red flag lease checker, fair market rent guide, and landlord checklist. Links to Community Restoration Hub.
 - **Community Restoration Hub** (`/housing/restore`): Browse foreclosed/abandoned/auctioned properties. Champion a property to restore as housing or community space. Crowdfunding (Stripe Connect placeholder, ready for integration). Labor pledges. Champion updates feed.
-- **Profile** (`/profile`): User bio, skills (tag-style), work history entries, and applications history.
+- **Profile** (`/profile`): User bio, skills (tag-style), work history entries, applications history. Full optional verification tier system with trust score ring (0-100) and trust badges. Verification methods: email, phone (SMS placeholder), Google, Meta, X, LinkedIn, Indeed, LACK Community ID, and WebAuthn biometrics (Face ID/fingerprint). Incentive banners on gig board and housing page nudge users to verify.
 
 ## Data Stored
 
@@ -25,6 +25,7 @@
 - **RestorationUpdate**: Progress updates posted by project champions
 - **LaborPledge**: User skill/hours pledges to restoration projects
 - **Rating**: Mutual user ratings (1-5 stars with comment) — workers rate employers and vice versa
+- **UserVerification**: Per-user verification records (method, verified status, verifiedAt, metadata JSON). Unique per userId+method.
 - **Report**: Reports on users or listings for moderation
 - **Block**: User-to-user blocks
 - **Conversation**: DM threads between two users
@@ -60,6 +61,13 @@
 - `sendMessage(conversationId, content)`: Send a message (requires auth)
 - `markMessagesRead(conversationId)`: Mark all messages in a conversation as read (requires auth)
 - `getUnreadCount()`: Get total unread message count for current user (requires auth)
+- `getMyVerifications()`: Get all verification records for current user (requires auth)
+- `startEmailVerification()`: Mark email as verified, +15 trust (requires auth)
+- `startPhoneVerification(phone)`: Store phone number, mark pending for SMS (requires auth)
+- `addSocialVerification(method, handle)`: Record social verification (google/meta/twitter/linkedin/indeed), +10 trust each (requires auth)
+- `addCommunityId(data)`: Store neighborhood, skills, reference name, +15 trust (requires auth)
+- `recordBiometricVerification()`: Mark biometric as verified after WebAuthn challenge, +20 trust (requires auth)
+- `getUserTrustScore(userId)`: Returns { score, badge, badges, verificationCount, methods }
 
 ## Ad Integration Notes
 

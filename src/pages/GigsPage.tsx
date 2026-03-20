@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { client } from "@/lib/client";
-import { MapPin, DollarSign, Clock, Plus, Briefcase, MessageCircle, MoreHorizontal } from "lucide-react";
+import { MapPin, DollarSign, Clock, Plus, Briefcase, MessageCircle, MoreHorizontal, ShieldCheck } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -301,6 +302,24 @@ export function GigsPage() {
   const [category, setCategory] = useState("All");
   const [postOpen, setPostOpen] = useState(false);
   const [applyGig, setApplyGig] = useState<Gig | null>(null);
+  const navigate = useNavigate();
+
+  const { data: verifications } = useQuery({
+    queryKey: ["myVerifications"],
+    queryFn: () => client.getMyVerifications(),
+    retry: false,
+  });
+
+  // Compute trust score
+  const verifiedMethods = new Set((verifications ?? []).filter((v) => v.verified).map((v) => v.method));
+  let trustScore = 0;
+  if (verifiedMethods.has("email")) trustScore += 15;
+  if (verifiedMethods.has("phone")) trustScore += 20;
+  if (verifiedMethods.has("biometric")) trustScore += 20;
+  if (verifiedMethods.has("community")) trustScore += 15;
+  const socialCount = ["google", "meta", "twitter", "linkedin", "indeed"].filter((m) => verifiedMethods.has(m)).length;
+  trustScore += Math.min(socialCount, 3) * 10;
+  const showIncentiveBanner = trustScore < 40;
 
   const reportMutation = useMutation({
     mutationFn: (gigId: string) => client.reportListing(gigId, "Reported by user"),
@@ -346,6 +365,24 @@ export function GigsPage() {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 py-6">
+        {/* Incentive banner */}
+        {showIncentiveBanner && (
+          <div className="mb-5 flex items-center justify-between gap-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-3">
+            <div className="flex items-center gap-2">
+              <ShieldCheck size={16} className="text-emerald-400 flex-shrink-0" />
+              <span className="text-zinc-300 text-xs">
+                <span className="text-emerald-400 font-bold">Boost your profile</span> — verified users get hired 3× faster.
+              </span>
+            </div>
+            <button
+              onClick={() => navigate("/profile")}
+              className="text-emerald-400 text-xs font-bold hover:underline whitespace-nowrap flex-shrink-0"
+            >
+              Complete verification →
+            </button>
+          </div>
+        )}
+
         {/* Category filters */}
         <div className="flex gap-2 flex-wrap mb-6">
           {categories.map((cat) => (

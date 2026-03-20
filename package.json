@@ -1,7 +1,7 @@
 {
   "name": "full-stack-app-template",
   "private": true,
-  "version": "1.5.0",
+  "version": "1.9.0",
   "type": "module",
   "scripts": {
     "dev:vite": "vite --host 0.0.0.0 2>&1 | tee -a vite-dev.log",
@@ -61,7 +61,9 @@
     "@radix-ui/react-tooltip": "^1.2.7",
     "@tailwindcss/vite": "^4.1.11",
     "@tanstack/react-query": "^5.83.0",
+    "@types/canvas-confetti": "^1.9.0",
     "better-sqlite3": "^12.5.0",
+    "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

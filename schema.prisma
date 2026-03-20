@@ -30,6 +30,10 @@ model User {
   conversationsAsUser2 Conversation[]     @relation("ConversationsAsUser2")
   messagesSent        Message[]            @relation("MessagesSent")
   verifications       UserVerification[]
+  earningsAccount     EarningsAccount?
+  privacySettings     PrivacySettings?
+  grindSessions       GrindSession[]
+  journeySessions     JourneySession[]
 }
 
 model UserVerification {
@@ -120,6 +124,7 @@ model Report {
   targetUserId    String?
   targetListingId String?
   reason          String
+  dismissed       Boolean  @default(false)
   createdAt       DateTime @default(now())
 }
 
@@ -189,4 +194,66 @@ model UserProfile {
   location    String   @default("")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model EarningsAccount {
+  id              String                @id @default(cuid())
+  userId          String                @unique
+  user            User                  @relation(fields: [userId], references: [id])
+  balanceCents    Int                   @default(0)
+  paidOutCents    Int                   @default(0)
+  payoutMethod    String                @default("")
+  cashAppHandle   String                @default("")
+  bankAccountName String                @default("")
+  bankRouting     String                @default("")
+  bankAccount     String                @default("")
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  transactions    EarningsTransaction[]
+}
+
+model EarningsTransaction {
+  id          String          @id @default(cuid())
+  accountId   String
+  account     EarningsAccount @relation(fields: [accountId], references: [id])
+  type        String          // "ad_view" | "video_complete" | "grind_ad" | "grind_video" | "data_opt_in_bonus" | "payout"
+  amountCents Int
+  description String
+  createdAt   DateTime        @default(now())
+}
+
+model PrivacySettings {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id])
+  shareUsageData  Boolean  @default(false)
+  shareInterests  Boolean  @default(false)
+  personalizedAds Boolean  @default(false)
+  tier1BonusPaid  Boolean  @default(false)
+  tier2BonusPaid  Boolean  @default(false)
+  tier3BonusPaid  Boolean  @default(false)
+  updatedAt       DateTime @updatedAt
+}
+
+model GrindSession {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  startedAt     DateTime  @default(now())
+  exitedAt      DateTime?
+  loopCount     Int       @default(0)
+  adsViewed     Int       @default(0)
+  videosWatched Int       @default(0)
+  earnedCents   Int       @default(0)
+}
+
+model JourneySession {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  startedAt     DateTime  @default(now())
+  completedAt   DateTime?
+  adsViewed     Int       @default(0)
+  videosWatched Int       @default(0)
+  earnedCents   Int       @default(0)
 }

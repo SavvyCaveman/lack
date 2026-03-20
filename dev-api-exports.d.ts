@@ -309,6 +309,7 @@ export declare function reportUser(targetUserId: string, reason: string): Promis
 	targetUserId: string | null;
 	targetListingId: string | null;
 	reason: string;
+	dismissed: boolean;
 }>;
 export declare function reportListing(targetListingId: string, reason: string): Promise<{
 	id: string;
@@ -317,6 +318,7 @@ export declare function reportListing(targetListingId: string, reason: string): 
 	targetUserId: string | null;
 	targetListingId: string | null;
 	reason: string;
+	dismissed: boolean;
 }>;
 export declare function blockUser(blockedId: string): Promise<{
 	id: string;
@@ -400,6 +402,178 @@ export declare function markMessagesRead(conversationId: string): Promise<{
 export declare function getUnreadCount(): Promise<{
 	count: number;
 }>;
+export declare function getMyVerifications(): Promise<{
+	id: string;
+	createdAt: Date;
+	userId: string;
+	method: string;
+	verified: boolean;
+	verifiedAt: Date | null;
+	metadata: string;
+}[]>;
+export declare function startEmailVerification(): Promise<{
+	id: string;
+	createdAt: Date;
+	userId: string;
+	method: string;
+	verified: boolean;
+	verifiedAt: Date | null;
+	metadata: string;
+}>;
+export declare function startPhoneVerification(phone: string): Promise<{
+	id: string;
+	createdAt: Date;
+	userId: string;
+	method: string;
+	verified: boolean;
+	verifiedAt: Date | null;
+	metadata: string;
+}>;
+export declare function addSocialVerification(method: string, handle: string): Promise<{
+	id: string;
+	createdAt: Date;
+	userId: string;
+	method: string;
+	verified: boolean;
+	verifiedAt: Date | null;
+	metadata: string;
+}>;
+export declare function addCommunityId(data: {
+	neighborhood: string;
+	skills: string;
+	reference: string;
+}): Promise<{
+	id: string;
+	createdAt: Date;
+	userId: string;
+	method: string;
+	verified: boolean;
+	verifiedAt: Date | null;
+	metadata: string;
+}>;
+export declare function recordBiometricVerification(): Promise<{
+	id: string;
+	createdAt: Date;
+	userId: string;
+	method: string;
+	verified: boolean;
+	verifiedAt: Date | null;
+	metadata: string;
+}>;
+export declare function getUserTrustScore(userId: string): Promise<{
+	score: number;
+	badge: string;
+	badges: string[];
+	verificationCount: number;
+	methods: string[];
+}>;
+export declare function getAdminStats(): Promise<{
+	userCount: number;
+	gigCount: number;
+	housingCount: number;
+	applicationCount: number;
+	messageCount: number;
+	pendingReportCount: number;
+	restorationCount: number;
+}>;
+export declare function getReports(): Promise<({
+	reporter: {
+		id: string;
+		name: string | null;
+		handle: string | null;
+	};
+} & {
+	id: string;
+	createdAt: Date;
+	reporterId: string;
+	targetUserId: string | null;
+	targetListingId: string | null;
+	reason: string;
+	dismissed: boolean;
+})[]>;
+export declare function dismissReport(reportId: string): Promise<{
+	id: string;
+	createdAt: Date;
+	reporterId: string;
+	targetUserId: string | null;
+	targetListingId: string | null;
+	reason: string;
+	dismissed: boolean;
+}>;
+export declare function adminDeleteGigListing(id: string): Promise<{
+	id: string;
+	title: string;
+	category: string;
+	payRate: string;
+	location: string;
+	description: string;
+	posterName: string;
+	posterEmail: string;
+	isCareer: boolean;
+	createdAt: Date;
+}>;
+export declare function adminDeleteHousingListing(id: string): Promise<{
+	type: string;
+	id: string;
+	description: string;
+	createdAt: Date;
+	propertyType: string;
+	price: number;
+	address: string;
+	neighborhood: string;
+	bedrooms: number;
+	bathrooms: number;
+	sqft: number;
+	utilitiesIncl: boolean;
+	petFriendly: boolean;
+	parking: boolean;
+	contactName: string;
+	contactEmail: string;
+}>;
+export declare function getAllUsers(): Promise<{
+	id: string;
+	name: string | null;
+	handle: string | null;
+	image: string | null;
+	location: string;
+	verificationCount: number;
+	trustScore: number;
+	applicationCount: number;
+}[]>;
+export declare function getAllGigsAdmin(): Promise<({
+	_count: {
+		applications: number;
+	};
+} & {
+	id: string;
+	title: string;
+	category: string;
+	payRate: string;
+	location: string;
+	description: string;
+	posterName: string;
+	posterEmail: string;
+	isCareer: boolean;
+	createdAt: Date;
+})[]>;
+export declare function getAllHousingAdmin(): Promise<{
+	type: string;
+	id: string;
+	description: string;
+	createdAt: Date;
+	propertyType: string;
+	price: number;
+	address: string;
+	neighborhood: string;
+	bedrooms: number;
+	bathrooms: number;
+	sqft: number;
+	utilitiesIncl: boolean;
+	petFriendly: boolean;
+	parking: boolean;
+	contactName: string;
+	contactEmail: string;
+}[]>;
 export declare function seedGigs(): Promise<{
 	seeded: boolean;
 	message: string;
@@ -409,5 +583,92 @@ export declare function seedGigs(): Promise<{
 	count: number;
 	message?: undefined;
 }>;
+export declare function getMyEarnings(): Promise<{
+	account: {
+		id: string;
+		createdAt: Date;
+		userId: string;
+		updatedAt: Date;
+		balanceCents: number;
+		paidOutCents: number;
+		payoutMethod: string;
+		cashAppHandle: string;
+		bankAccountName: string;
+		bankRouting: string;
+		bankAccount: string;
+	};
+	transactions: {
+		type: string;
+		id: string;
+		description: string;
+		createdAt: Date;
+		accountId: string;
+		amountCents: number;
+	}[];
+}>;
+export declare function recordAdView(type: "banner" | "interstitial" | "video"): Promise<{
+	earned: number;
+}>;
+export declare function startJourney(): Promise<{
+	sessionId: string;
+}>;
+export declare function recordJourneyStep(sessionId: string, type: "ad" | "video"): Promise<{
+	earned: number;
+}>;
+export declare function completeJourney(sessionId: string): Promise<{
+	totalEarned: number;
+}>;
+export declare function startGrind(): Promise<{
+	sessionId: string;
+}>;
+export declare function recordGrindStep(sessionId: string, type: "ad" | "video"): Promise<{
+	earned: number;
+	loopCount: number;
+	totalEarned: number;
+}>;
+export declare function exitGrind(sessionId: string): Promise<{
+	totalEarned: number;
+	loopCount: number;
+}>;
+export declare function getMyPrivacySettings(): Promise<{
+	id: string;
+	userId: string;
+	updatedAt: Date;
+	shareUsageData: boolean;
+	shareInterests: boolean;
+	personalizedAds: boolean;
+	tier1BonusPaid: boolean;
+	tier2BonusPaid: boolean;
+	tier3BonusPaid: boolean;
+}>;
+export declare function updatePrivacySettings(settings: {
+	shareUsageData?: boolean;
+	shareInterests?: boolean;
+	personalizedAds?: boolean;
+}): Promise<{
+	settings: {
+		id: string;
+		userId: string;
+		updatedAt: Date;
+		shareUsageData: boolean;
+		shareInterests: boolean;
+		personalizedAds: boolean;
+		tier1BonusPaid: boolean;
+		tier2BonusPaid: boolean;
+		tier3BonusPaid: boolean;
+	};
+	bonusEarned: number;
+}>;
+export declare function requestPayout(method: string, details: Record<string, string>): Promise<{
+	requested: boolean;
+	amountCents: number;
+}>;
+export declare function setPayoutMethod(method: string, details: Record<string, string>): Promise<{
+	updated: boolean;
+}>;
+export declare function getEarningsLeaderboard(): Promise<{
+	displayName: string;
+	balanceCents: number;
+}[]>;
 
 export {};

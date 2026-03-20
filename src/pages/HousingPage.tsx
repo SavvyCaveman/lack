@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { client } from "@/lib/client";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Home,
   Building2,
@@ -19,6 +19,7 @@ import {
   Info,
   ExternalLink,
   MessageCircle,
+  ShieldCheck,
 } from "lucide-react";
 import { openChatWithUser } from "@/lib/chat";
 
@@ -673,6 +674,23 @@ export function HousingPage() {
     undefined,
   );
   const [showPostModal, setShowPostModal] = useState(false);
+  const navigate = useNavigate();
+
+  const { data: verifications } = useQuery({
+    queryKey: ["myVerifications"],
+    queryFn: () => client.getMyVerifications(),
+    retry: false,
+  });
+
+  const verifiedMethods = new Set((verifications ?? []).filter((v) => v.verified).map((v) => v.method));
+  let trustScore = 0;
+  if (verifiedMethods.has("email")) trustScore += 15;
+  if (verifiedMethods.has("phone")) trustScore += 20;
+  if (verifiedMethods.has("biometric")) trustScore += 20;
+  if (verifiedMethods.has("community")) trustScore += 15;
+  const socialCount = ["google", "meta", "twitter", "linkedin", "indeed"].filter((m) => verifiedMethods.has(m)).length;
+  trustScore += Math.min(socialCount, 3) * 10;
+  const showIncentiveBanner = trustScore < 40;
 
   const { data: listings, isLoading } = useQuery({
     queryKey: ["housing", typeFilter, bedroomsFilter],
@@ -722,6 +740,24 @@ export function HousingPage() {
           </Link>
         </div>
       </div>
+
+      {/* Incentive banner */}
+      {showIncentiveBanner && tab === "listings" && (
+        <div className="mb-5 flex items-center justify-between gap-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-3">
+          <div className="flex items-center gap-2">
+            <ShieldCheck size={16} className="text-emerald-400 flex-shrink-0" />
+            <span className="text-zinc-300 text-xs">
+              <span className="text-emerald-400 font-bold">Boost your profile</span> — verified users get 3× more responses from landlords.
+            </span>
+          </div>
+          <button
+            onClick={() => navigate("/profile")}
+            className="text-emerald-400 text-xs font-bold hover:underline whitespace-nowrap flex-shrink-0"
+          >
+            Complete verification →
+          </button>
+        </div>
+      )}
 
       {/* Tab bar */}
       <div className="flex gap-2 mb-6 border-b border-white/10 pb-0">

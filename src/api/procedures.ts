@@ -800,6 +800,294 @@ export async function getUnreadCount() {
   return { count };
 }
 
+// ---- Verification ----
+
+export async function getMyVerifications() {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+
+  await db.user.upsert({
+    where: { id: userId },
+    create: { id: userId },
+    update: {},
+  });
+
+  return await db.userVerification.findMany({
+    where: { userId },
+    orderBy: { createdAt: "asc" },
+  });
+}
+
+export async function startEmailVerification() {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+
+  await db.user.upsert({
+    where: { id: userId },
+    create: { id: userId },
+    update: {},
+  });
+
+  return await db.userVerification.upsert({
+    where: { userId_method: { userId, method: "email" } },
+    create: { userId, method: "email", verified: true, verifiedAt: new Date() },
+    update: { verified: true, verifiedAt: new Date() },
+  });
+}
+
+export async function startPhoneVerification(phone: string) {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+
+  await db.user.upsert({
+    where: { id: userId },
+    create: { id: userId },
+    update: {},
+  });
+
+  // Store phone, mark pending (Twilio integration placeholder)
+  return await db.userVerification.upsert({
+    where: { userId_method: { userId, method: "phone" } },
+    create: {
+      userId,
+      method: "phone",
+      verified: false,
+      metadata: JSON.stringify({ phone }),
+    },
+    update: {
+      metadata: JSON.stringify({ phone }),
+    },
+  });
+}
+
+export async function addSocialVerification(method: string, handle: string) {
+  const validMethods = ["google", "meta", "twitter", "linkedin", "indeed"];
+  if (!validMethods.includes(method))
+    throw new Error("Invalid social method");
+
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+
+  await db.user.upsert({
+    where: { id: userId },
+    create: { id: userId },
+    update: {},
+  });
+
+  return await db.userVerification.upsert({
+    where: { userId_method: { userId, method } },
+    create: {
+      userId,
+      method,
+      verified: true,
+      verifiedAt: new Date(),
+      metadata: JSON.stringify({ handle }),
+    },
+    update: {
+      verified: true,
+      verifiedAt: new Date(),
+      metadata: JSON.stringify({ handle }),
+    },
+  });
+}
+
+export async function addCommunityId(data: {
+  neighborhood: string;
+  skills: string;
+  reference: string;
+}) {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+
+  await db.user.upsert({
+    where: { id: userId },
+    create: { id: userId },
+    update: {},
+  });
+
+  return await db.userVerification.upsert({
+    where: { userId_method: { userId, method: "community" } },
+    create: {
+      userId,
+      method: "community",
+      verified: true,
+      verifiedAt: new Date(),
+      metadata: JSON.stringify(data),
+    },
+    update: {
+      verified: true,
+      verifiedAt: new Date(),
+      metadata: JSON.stringify(data),
+    },
+  });
+}
+
+export async function recordBiometricVerification() {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+
+  await db.user.upsert({
+    where: { id: userId },
+    create: { id: userId },
+    update: {},
+  });
+
+  return await db.userVerification.upsert({
+    where: { userId_method: { userId, method: "biometric" } },
+    create: {
+      userId,
+      method: "biometric",
+      verified: true,
+      verifiedAt: new Date(),
+    },
+    update: { verified: true, verifiedAt: new Date() },
+  });
+}
+
+export async function getUserTrustScore(userId: string) {
+  const verifications = await db.userVerification.findMany({
+    where: { userId, verified: true },
+  });
+
+  const methods = new Set(verifications.map((v) => v.method));
+
+  let score = 0;
+  if (methods.has("email")) score += 15;
+  if (methods.has("phone")) score += 20;
+  if (methods.has("biometric")) score += 20;
+  if (methods.has("community")) score += 15;
+
+  // Social: up to 3 × 10 = 30
+  const socialMethods = ["google", "meta", "twitter", "linkedin", "indeed"];
+  const socialCount = socialMethods.filter((m) => methods.has(m)).length;
+  score += Math.min(socialCount, 3) * 10;
+
+  // Badge
+  let badge = "";
+  if (score >= 81) badge = "LACK Verified ✓";
+  else if (score >= 61) badge = "Verified Member";
+  else if (score >= 41) badge = "Trusted Member";
+  else if (score >= 21) badge = "Community Member";
+
+  return {
+    score,
+    badge,
+    badges: badge ? [badge] : [],
+    verificationCount: verifications.length,
+    methods: Array.from(methods),
+  };
+}
+
+// ---- Admin ----
+
+export async function getAdminStats() {
+  const [
+    userCount,
+    gigCount,
+    housingCount,
+    applicationCount,
+    messageCount,
+    pendingReportCount,
+    restorationCount,
+  ] = await Promise.all([
+    db.user.count(),
+    db.gigListing.count(),
+    db.housingListing.count(),
+    db.gigApplication.count(),
+    db.message.count(),
+    db.report.count({ where: { dismissed: false } }),
+    db.restorationProject.count(),
+  ]);
+
+  return {
+    userCount,
+    gigCount,
+    housingCount,
+    applicationCount,
+    messageCount,
+    pendingReportCount,
+    restorationCount,
+  };
+}
+
+export async function getReports() {
+  return await db.report.findMany({
+    orderBy: { createdAt: "desc" },
+    include: {
+      reporter: { select: { id: true, name: true, handle: true } },
+    },
+  });
+}
+
+export async function dismissReport(reportId: string) {
+  return await db.report.update({
+    where: { id: reportId },
+    data: { dismissed: true },
+  });
+}
+
+export async function adminDeleteGigListing(id: string) {
+  // Delete applications first
+  await db.gigApplication.deleteMany({ where: { gigId: id } });
+  return await db.gigListing.delete({ where: { id } });
+}
+
+export async function adminDeleteHousingListing(id: string) {
+  return await db.housingListing.delete({ where: { id } });
+}
+
+export async function getAllUsers() {
+  const users = await db.user.findMany({
+    include: {
+      profile: true,
+      verifications: { where: { verified: true } },
+      applications: { select: { id: true } },
+      _count: {
+        select: { applications: true },
+      },
+    },
+    orderBy: { id: "asc" },
+  });
+
+  return users.map((u) => {
+    const methods = new Set(u.verifications.map((v) => v.method));
+    let score = 0;
+    if (methods.has("email")) score += 15;
+    if (methods.has("phone")) score += 20;
+    if (methods.has("biometric")) score += 20;
+    if (methods.has("community")) score += 15;
+    const socialMethods = ["google", "meta", "twitter", "linkedin", "indeed"];
+    const socialCount = socialMethods.filter((m) => methods.has(m)).length;
+    score += Math.min(socialCount, 3) * 10;
+
+    return {
+      id: u.id,
+      name: u.name,
+      handle: u.handle,
+      image: u.image,
+      location: u.profile?.location ?? "",
+      verificationCount: u.verifications.length,
+      trustScore: score,
+      applicationCount: u._count.applications,
+    };
+  });
+}
+
+export async function getAllGigsAdmin() {
+  return await db.gigListing.findMany({
+    orderBy: { createdAt: "desc" },
+    include: {
+      _count: { select: { applications: true } },
+    },
+  });
+}
+
+export async function getAllHousingAdmin() {
+  return await db.housingListing.findMany({
+    orderBy: { createdAt: "desc" },
+  });
+}
+
 // ---- Seed Data ----
 
 export async function seedGigs() {
@@ -973,4 +1261,351 @@ export async function seedGigs() {
   await db.gigListing.createMany({ data: gigs });
 
   return { seeded: true, count: gigs.length };
+}
+
+// ---- Earnings & Revenue Share ----
+
+async function ensureEarningsAccount(userId: string) {
+  return await db.earningsAccount.upsert({
+    where: { userId },
+    create: { userId },
+    update: {},
+  });
+}
+
+export async function getMyEarnings() {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+  await db.user.upsert({ where: { id: userId }, create: { id: userId }, update: {} });
+  const account = await ensureEarningsAccount(userId);
+  const transactions = await db.earningsTransaction.findMany({
+    where: { accountId: account.id },
+    orderBy: { createdAt: "desc" },
+    take: 20,
+  });
+  return { account, transactions };
+}
+
+export async function recordAdView(type: "banner" | "interstitial" | "video") {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+  await db.user.upsert({ where: { id: userId }, create: { id: userId }, update: {} });
+  const account = await ensureEarningsAccount(userId);
+
+  // User earns 75%, LACK keeps 25%
+  const earningsCents = type === "banner" ? 0.075 : type === "interstitial" ? 0.375 : 1.5;
+  const centsInt = Math.max(1, Math.round(earningsCents));
+
+  const labels: Record<string, string> = {
+    banner: "Banner ad view",
+    interstitial: "Interstitial ad view",
+    video: "Video ad completed",
+  };
+
+  await db.earningsTransaction.create({
+    data: {
+      accountId: account.id,
+      type: "ad_view",
+      amountCents: centsInt,
+      description: labels[type],
+    },
+  });
+
+  await db.earningsAccount.update({
+    where: { id: account.id },
+    data: { balanceCents: { increment: centsInt } },
+  });
+
+  return { earned: centsInt };
+}
+
+// ---- The Journey (8-step earn sequence) ----
+
+export async function startJourney() {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+  await db.user.upsert({ where: { id: userId }, create: { id: userId }, update: {} });
+
+  const session = await db.journeySession.create({
+    data: { userId },
+  });
+  return { sessionId: session.id };
+}
+
+export async function recordJourneyStep(sessionId: string, type: "ad" | "video") {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+
+  const session = await db.journeySession.findUnique({ where: { id: sessionId } });
+  if (!session || session.userId !== userId) throw new Error("Session not found");
+  if (session.completedAt) throw new Error("Journey already completed");
+
+  const earningsCents = type === "ad" ? 1 : 2;
+
+  await db.journeySession.update({
+    where: { id: sessionId },
+    data: {
+      adsViewed: type === "ad" ? { increment: 1 } : undefined,
+      videosWatched: type === "video" ? { increment: 1 } : undefined,
+      earnedCents: { increment: earningsCents },
+    },
+  });
+
+  const account = await ensureEarningsAccount(userId);
+  await db.earningsTransaction.create({
+    data: {
+      accountId: account.id,
+      type: "ad_view",
+      amountCents: earningsCents,
+      description: type === "ad" ? "Journey: ad step" : "Journey: video watched",
+    },
+  });
+  await db.earningsAccount.update({
+    where: { id: account.id },
+    data: { balanceCents: { increment: earningsCents } },
+  });
+
+  return { earned: earningsCents };
+}
+
+export async function completeJourney(sessionId: string) {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+
+  const session = await db.journeySession.findUnique({ where: { id: sessionId } });
+  if (!session || session.userId !== userId) throw new Error("Session not found");
+
+  const bonusCents = 5;
+  await db.journeySession.update({
+    where: { id: sessionId },
+    data: {
+      completedAt: new Date(),
+      earnedCents: { increment: bonusCents },
+    },
+  });
+
+  const account = await ensureEarningsAccount(userId);
+  await db.earningsTransaction.create({
+    data: {
+      accountId: account.id,
+      type: "journey_bonus",
+      amountCents: bonusCents,
+      description: "Journey completion bonus",
+    },
+  });
+  await db.earningsAccount.update({
+    where: { id: account.id },
+    data: { balanceCents: { increment: bonusCents } },
+  });
+
+  const updatedSession = await db.journeySession.findUnique({ where: { id: sessionId } });
+  return { totalEarned: updatedSession!.earnedCents };
+}
+
+// ---- The Grind (infinite loop earn system) ----
+
+export async function startGrind() {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+  await db.user.upsert({ where: { id: userId }, create: { id: userId }, update: {} });
+
+  const session = await db.grindSession.create({
+    data: { userId },
+  });
+  return { sessionId: session.id };
+}
+
+export async function recordGrindStep(sessionId: string, type: "ad" | "video") {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+
+  const session = await db.grindSession.findUnique({ where: { id: sessionId } });
+  if (!session || session.userId !== userId) throw new Error("Session not found");
+  if (session.exitedAt) throw new Error("Grind session already exited");
+
+  // ad = 0.5¢ (stored as 1 cent min), video = 2¢
+  const earningsCents = type === "ad" ? 1 : 2;
+
+  // Update loop count when an ad completes (start of new loop)
+  const newLoopCount = type === "ad" ? session.loopCount + 1 : session.loopCount;
+
+  await db.grindSession.update({
+    where: { id: sessionId },
+    data: {
+      adsViewed: type === "ad" ? { increment: 1 } : undefined,
+      videosWatched: type === "video" ? { increment: 1 } : undefined,
+      earnedCents: { increment: earningsCents },
+      loopCount: newLoopCount,
+    },
+  });
+
+  const account = await ensureEarningsAccount(userId);
+  await db.earningsTransaction.create({
+    data: {
+      accountId: account.id,
+      type: type === "ad" ? "grind_ad" : "grind_video",
+      amountCents: earningsCents,
+      description: type === "ad" ? "The Grind: interstitial ad" : "The Grind: video watched",
+    },
+  });
+  await db.earningsAccount.update({
+    where: { id: account.id },
+    data: { balanceCents: { increment: earningsCents } },
+  });
+
+  const updatedSession = await db.grindSession.findUnique({ where: { id: sessionId } });
+  return { earned: earningsCents, loopCount: updatedSession!.loopCount, totalEarned: updatedSession!.earnedCents };
+}
+
+export async function exitGrind(sessionId: string) {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+
+  const session = await db.grindSession.findUnique({ where: { id: sessionId } });
+  if (!session || session.userId !== userId) throw new Error("Session not found");
+
+  await db.grindSession.update({
+    where: { id: sessionId },
+    data: { exitedAt: new Date() },
+  });
+
+  return { totalEarned: session.earnedCents, loopCount: session.loopCount };
+}
+
+export async function getMyPrivacySettings() {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+  await db.user.upsert({ where: { id: userId }, create: { id: userId }, update: {} });
+
+  return await db.privacySettings.upsert({
+    where: { userId },
+    create: { userId },
+    update: {},
+  });
+}
+
+export async function updatePrivacySettings(settings: {
+  shareUsageData?: boolean;
+  shareInterests?: boolean;
+  personalizedAds?: boolean;
+}) {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+  await db.user.upsert({ where: { id: userId }, create: { id: userId }, update: {} });
+
+  const existing = await db.privacySettings.upsert({
+    where: { userId },
+    create: { userId },
+    update: {},
+  });
+
+  const account = await ensureEarningsAccount(userId);
+  let bonusCents = 0;
+  const bonusDesc: string[] = [];
+
+  if (settings.shareUsageData === true && !existing.shareUsageData) {
+    bonusCents += 10;
+    bonusDesc.push("Tier 1 data opt-in bonus");
+  }
+  if (settings.shareInterests === true && !existing.shareInterests) {
+    bonusCents += 25;
+    bonusDesc.push("Tier 2 data opt-in bonus");
+  }
+  if (settings.personalizedAds === true && !existing.personalizedAds) {
+    bonusCents += 50;
+    bonusDesc.push("Tier 3 personalized ads bonus");
+  }
+
+  if (bonusCents > 0) {
+    await db.earningsTransaction.create({
+      data: {
+        accountId: account.id,
+        type: "data_opt_in_bonus",
+        amountCents: bonusCents,
+        description: bonusDesc.join(", "),
+      },
+    });
+    await db.earningsAccount.update({
+      where: { id: account.id },
+      data: { balanceCents: { increment: bonusCents } },
+    });
+  }
+
+  const updated = await db.privacySettings.update({
+    where: { userId },
+    data: {
+      shareUsageData: settings.shareUsageData ?? existing.shareUsageData,
+      shareInterests: settings.shareInterests ?? existing.shareInterests,
+      personalizedAds: settings.personalizedAds ?? existing.personalizedAds,
+    },
+  });
+
+  return { settings: updated, bonusEarned: bonusCents };
+}
+
+export async function requestPayout(method: string, details: Record<string, string>) {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+  await db.user.upsert({ where: { id: userId }, create: { id: userId }, update: {} });
+
+  const account = await ensureEarningsAccount(userId);
+  if (account.balanceCents < 100) throw new Error("Minimum payout is $1.00");
+
+  const amount = account.balanceCents;
+  await db.earningsTransaction.create({
+    data: {
+      accountId: account.id,
+      type: "payout",
+      amountCents: -amount,
+      description: `Payout requested via ${method}`,
+    },
+  });
+  await db.earningsAccount.update({
+    where: { id: account.id },
+    data: {
+      balanceCents: 0,
+      paidOutCents: { increment: amount },
+      payoutMethod: method,
+      cashAppHandle: details.cashAppHandle ?? account.cashAppHandle,
+      bankAccountName: details.bankAccountName ?? account.bankAccountName,
+      bankRouting: details.bankRouting ?? account.bankRouting,
+      bankAccount: details.bankAccount ?? account.bankAccount,
+    },
+  });
+
+  return { requested: true, amountCents: amount };
+}
+
+export async function setPayoutMethod(method: string, details: Record<string, string>) {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+  await db.user.upsert({ where: { id: userId }, create: { id: userId }, update: {} });
+
+  const account = await ensureEarningsAccount(userId);
+  await db.earningsAccount.update({
+    where: { id: account.id },
+    data: {
+      payoutMethod: method,
+      cashAppHandle: details.cashAppHandle ?? "",
+      bankAccountName: details.bankAccountName ?? "",
+      bankRouting: details.bankRouting ?? "",
+      bankAccount: details.bankAccount ?? "",
+    },
+  });
+  return { updated: true };
+}
+
+export async function getEarningsLeaderboard() {
+  const topAccounts = await db.earningsAccount.findMany({
+    orderBy: { balanceCents: "desc" },
+    take: 10,
+    include: { user: true },
+  });
+
+  return topAccounts.map((a) => ({
+    displayName: a.user.name
+      ? `${a.user.name.split(" ")[0]} ${a.user.name.split(" ")[1]?.[0] ?? ""}.`
+      : "Anonymous",
+    balanceCents: a.balanceCents + a.paidOutCents,
+  }));
 }
