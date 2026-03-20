@@ -1014,8 +1014,13 @@ export function EarnPage() {
       )}
       {showPayout && <PayoutModal account={earningsQuery.data?.account ?? null} onClose={() => setShowPayout(false)} />}
 
-      <div className="bg-gradient-to-b from-emerald-950/40 to-transparent border-b border-white/5">
-        <div className="max-w-5xl mx-auto px-4 py-8">
+      <div className="relative border-b border-white/5 overflow-hidden">
+        {/* Hero image */}
+        <div className="absolute inset-0 pointer-events-none">
+          <img src="/hero-earn.jpg" alt="" className="w-full h-full object-cover object-top opacity-20" />
+          <div className="absolute inset-0 bg-gradient-to-b from-zinc-950/40 via-zinc-950/70 to-zinc-950" />
+        </div>
+        <div className="relative max-w-5xl mx-auto px-4 py-8">
           <div className="flex items-center gap-2 mb-3">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             <span className="text-emerald-400 text-xs font-bold tracking-widest uppercase">75% Revenue Share — You Earn</span>

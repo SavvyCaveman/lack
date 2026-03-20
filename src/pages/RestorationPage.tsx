@@ -604,6 +604,17 @@ export function RestorationPage() {
 
       {/* Hero */}
       <div className="mb-10">
+        {/* Hero image */}
+        <div className="relative rounded-2xl overflow-hidden mb-6 h-40 md:h-56">
+          <img src="/hero-restoration.jpg" alt="Community Restoration" className="w-full h-full object-cover object-center" />
+          <div className="absolute inset-0 bg-gradient-to-r from-zinc-950/80 to-transparent" />
+          <div className="absolute inset-0 flex items-center px-6">
+            <div>
+              <p className="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1">Community Restoration Hub</p>
+              <h1 className="text-white font-black text-2xl md:text-3xl">Turn Abandoned Buildings<br />Into Homes</h1>
+            </div>
+          </div>
+        </div>
         <div className="flex items-center gap-3 mb-3">
           <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
             <Building size={24} className="text-emerald-400" />

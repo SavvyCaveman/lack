@@ -128,10 +128,12 @@ export function HomePage() {
     <div className="min-h-screen bg-zinc-950">
       <CornerVideoWidget />
       {/* Hero */}
-      <div className="relative overflow-hidden">
-        {/* Background glow */}
-        <div className="absolute inset-0 bg-gradient-to-br from-emerald-950/40 via-zinc-950 to-zinc-950 pointer-events-none" />
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="relative overflow-hidden min-h-[520px]">
+        {/* Background hero image */}
+        <div className="absolute inset-0 pointer-events-none">
+          <img src="/hero-community.jpg" alt="" className="w-full h-full object-cover object-center opacity-25" />
+          <div className="absolute inset-0 bg-gradient-to-b from-zinc-950/50 via-zinc-950/75 to-zinc-950" />
+        </div>
 
         <div className="relative max-w-4xl mx-auto px-4 pt-10 pb-12 text-center">
           <div className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-4 py-1.5 text-emerald-400 text-xs font-semibold tracking-wider mb-6">
