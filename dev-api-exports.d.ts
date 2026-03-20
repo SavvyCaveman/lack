@@ -670,5 +670,160 @@ export declare function getEarningsLeaderboard(): Promise<{
 	displayName: string;
 	balanceCents: number;
 }[]>;
+export declare function getMyMarketingProfile(): Promise<{
+	_count: {
+		surveyResponses: number;
+	};
+} & {
+	id: string;
+	location: string;
+	createdAt: Date;
+	userId: string;
+	updatedAt: Date;
+	ageRange: string;
+	gender: string;
+	interests: string;
+	brandAffinities: string;
+	purchaseIntent: string;
+	incomeRange: string;
+	employmentStatus: string;
+	dataConsentLevel: number;
+	profileScore: number;
+}>;
+export declare function updateMarketingProfile(data: {
+	ageRange?: string;
+	gender?: string;
+	location?: string;
+	interests?: string[];
+	brandAffinities?: string[];
+	purchaseIntent?: string[];
+	incomeRange?: string;
+	employmentStatus?: string;
+}): Promise<{
+	profileScore: number;
+	_count: {
+		surveyResponses: number;
+	};
+	id: string;
+	location: string;
+	createdAt: Date;
+	userId: string;
+	updatedAt: Date;
+	ageRange: string;
+	gender: string;
+	interests: string;
+	brandAffinities: string;
+	purchaseIntent: string;
+	incomeRange: string;
+	employmentStatus: string;
+	dataConsentLevel: number;
+}>;
+export declare function submitSurveyResponse(data: {
+	videoTheme: string;
+	q1_recall?: number;
+	q2_interest?: number;
+	q3_purchase?: number;
+	q4_remember?: boolean;
+	q5_freeform?: string;
+}): Promise<{
+	response: {
+		id: string;
+		createdAt: Date;
+		userId: string;
+		earnedCents: number;
+		profileId: string;
+		videoTheme: string;
+		brandName: string;
+		q1_recall: number | null;
+		q2_interest: number | null;
+		q3_purchase: number | null;
+		q4_remember: boolean | null;
+		q5_freeform: string;
+	};
+	earnedCents: number;
+}>;
+export declare function getMyDataSnapshot(): Promise<{
+	profile: {
+		ageRange: string;
+		gender: string;
+		location: string;
+		interests: string[];
+		brandAffinities: string[];
+		purchaseIntent: string[];
+		incomeRange: string;
+		employmentStatus: string;
+		profileScore: number;
+		dataConsentLevel: number;
+	} | null;
+	privacy: {
+		shareUsageData: boolean;
+		shareInterests: boolean;
+		personalizedAds: boolean;
+	} | null;
+	surveyCount: number;
+	totalEarned: number;
+	thirdPartySharing: string;
+}>;
+export declare function deleteMyData(): Promise<{
+	deleted: boolean;
+}>;
+export declare function completeProfileOnboarding(data: {
+	ageRange: string;
+	employmentStatus: string;
+	interests: string[];
+	incomeRange?: string;
+	lookingFor: string[];
+}): Promise<{
+	completed: boolean;
+	bonusEarned: number;
+}>;
+/** Main aggregation job — called by cron every 3 hours */
+export declare function aggregateJobs(): Promise<{
+	upserted: number;
+	sources: {
+		remotive: number;
+		themuse: number;
+		adzuna: number;
+	};
+}>;
+/** Get aggregated jobs for the careers page */
+export declare function getExternalJobs(limit?: number): Promise<{
+	url: string;
+	id: string;
+	title: string;
+	location: string;
+	description: string;
+	source: string;
+	externalId: string;
+	company: string;
+	salary: string;
+	postedAt: Date;
+	fetchedAt: Date;
+	isActive: boolean;
+}[]>;
+export declare function getAvailableOffers(): Promise<{
+	id: string;
+	title: string;
+	reward: number;
+	category: string;
+	timeEstimate: string;
+	icon: string;
+}[]>;
+export declare function completeOffer(offerId: string, offerTitle: string, earnedCents: number): Promise<{
+	success: boolean;
+	earnedCents: number;
+}>;
+export declare function getAvailableSurveys(): Promise<{
+	id: string;
+	title: string;
+	reward: number;
+	length: string;
+	topic: string;
+	icon: string;
+}[]>;
+export declare function completePollSurvey(surveyId: string, earnedCents: number): Promise<{
+	success: boolean;
+	earnedCents: number;
+}>;
 
 export {};

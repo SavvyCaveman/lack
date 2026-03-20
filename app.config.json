@@ -1,5 +1,15 @@
 {
-  "crons": [],
+  "crons": [
+    {
+      "slug": "aggregate-jobs",
+      "name": "Job Aggregator",
+      "description": "Pulls fresh job listings from Indeed, USAJobs, and Adzuna every 3 hours for the St. Louis area",
+      "schedule": "0 */3 * * *",
+      "rpcEndpoint": "aggregateJobs",
+      "isEnabled": true,
+      "timezone": "America/Chicago"
+    }
+  ],
   "events": [],
   "webhooks": []
 }

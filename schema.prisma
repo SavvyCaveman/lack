@@ -34,6 +34,10 @@ model User {
   privacySettings     PrivacySettings?
   grindSessions       GrindSession[]
   journeySessions     JourneySession[]
+  marketingProfile      MarketingProfile?
+  surveyResponses       SurveyResponse[]
+  offerCompletions      OfferCompletion[]
+  pollSurveyCompletions PollSurveyCompletion[]
 }
 
 model UserVerification {
@@ -247,6 +251,23 @@ model GrindSession {
   earnedCents   Int       @default(0)
 }
 
+model ExternalJob {
+  id           String   @id @default(cuid())
+  source       String   // "indeed" | "usajobs" | "adzuna"
+  externalId   String   // unique key from source to avoid duplicates
+  title        String
+  company      String   @default("")
+  location     String   @default("")
+  description  String   @default("")
+  salary       String   @default("")
+  url          String   @default("")
+  postedAt     DateTime @default(now())
+  fetchedAt    DateTime @default(now())
+  isActive     Boolean  @default(true)
+
+  @@unique([source, externalId])
+}
+
 model JourneySession {
   id            String    @id @default(cuid())
   userId        String
@@ -256,4 +277,60 @@ model JourneySession {
   adsViewed     Int       @default(0)
   videosWatched Int       @default(0)
   earnedCents   Int       @default(0)
+}
+
+model MarketingProfile {
+  id               String           @id @default(cuid())
+  userId           String           @unique
+  user             User             @relation(fields: [userId], references: [id])
+  ageRange         String           @default("")
+  gender           String           @default("")
+  location         String           @default("")
+  interests        String           @default("[]")
+  brandAffinities  String           @default("[]")
+  purchaseIntent   String           @default("[]")
+  incomeRange      String           @default("")
+  employmentStatus String           @default("")
+  dataConsentLevel Int              @default(0)
+  profileScore     Int              @default(0)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  surveyResponses  SurveyResponse[]
+}
+
+model SurveyResponse {
+  id          String           @id @default(cuid())
+  userId      String
+  user        User             @relation(fields: [userId], references: [id])
+  profileId   String
+  profile     MarketingProfile @relation(fields: [profileId], references: [id])
+  videoTheme  String
+  brandName   String           @default("")
+  q1_recall   Int?
+  q2_interest Int?
+  q3_purchase Int?
+  q4_remember Boolean?
+  q5_freeform String           @default("")
+  earnedCents Int              @default(0)
+  createdAt   DateTime         @default(now())
+}
+
+model OfferCompletion {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  offerId     String
+  offerTitle  String
+  earnedCents Int
+  source      String   @default("tapjoy")
+  completedAt DateTime @default(now())
+}
+
+model PollSurveyCompletion {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  surveyId    String
+  earnedCents Int
+  completedAt DateTime @default(now())
 }

@@ -1,5 +1,66 @@
 import { Link } from "react-router-dom";
-import { DollarSign, Briefcase, Award, ArrowRight, Zap, Users, TrendingUp, Home } from "lucide-react";
+import { useState, useRef } from "react";
+import { DollarSign, Briefcase, Award, ArrowRight, Zap, Users, TrendingUp, Home, X, Play } from "lucide-react";
+
+function CornerVideoWidget() {
+  const [dismissed, setDismissed] = useState(() => !!localStorage.getItem("lack_welcome_seen"));
+  const [playing, setPlaying] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  if (dismissed) return null;
+
+  const handlePlay = () => {
+    setPlaying(true);
+    videoRef.current?.play();
+  };
+
+  const handleDismiss = () => {
+    localStorage.setItem("lack_welcome_seen", "1");
+    setDismissed(true);
+  };
+
+  const handleEnded = () => {
+    localStorage.setItem("lack_welcome_seen", "1");
+    setTimeout(() => setDismissed(true), 2000);
+  };
+
+  return (
+    <div className="fixed bottom-24 right-6 z-[9990] w-48 rounded-2xl overflow-hidden border border-white/10 shadow-2xl bg-zinc-900">
+      {/* Header bar */}
+      <div className="flex items-center justify-between px-3 py-2 bg-zinc-800/80">
+        <span className="text-emerald-400 text-xs font-bold">Welcome to LACK</span>
+        <button onClick={handleDismiss} className="text-zinc-500 hover:text-white transition-colors">
+          <X size={12} />
+        </button>
+      </div>
+      {/* Video */}
+      <div className="relative bg-zinc-950">
+        <video
+          ref={videoRef}
+          src="/lack-intro.mp4"
+          muted
+          playsInline
+          loop={false}
+          onEnded={handleEnded}
+          className="w-full"
+        />
+        {!playing && (
+          <button
+            onClick={handlePlay}
+            className="absolute inset-0 flex items-center justify-center bg-black/40 hover:bg-black/20 transition-colors"
+          >
+            <div className="w-10 h-10 rounded-full bg-emerald-500/90 flex items-center justify-center">
+              <Play size={16} className="text-black ml-0.5" />
+            </div>
+          </button>
+        )}
+      </div>
+      <div className="px-3 py-2 bg-zinc-900">
+        <p className="text-zinc-400 text-xs leading-snug">Find work. Earn now. Get ahead.</p>
+      </div>
+    </div>
+  );
+}
 
 const sections = [
   {
@@ -65,19 +126,29 @@ const stats = [
 export function HomePage() {
   return (
     <div className="min-h-screen bg-zinc-950">
+      <CornerVideoWidget />
       {/* Hero */}
       <div className="relative overflow-hidden">
         {/* Background glow */}
         <div className="absolute inset-0 bg-gradient-to-br from-emerald-950/40 via-zinc-950 to-zinc-950 pointer-events-none" />
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative max-w-4xl mx-auto px-4 pt-16 pb-12 text-center">
+        <div className="relative max-w-4xl mx-auto px-4 pt-10 pb-12 text-center">
           <div className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-4 py-1.5 text-emerald-400 text-xs font-semibold tracking-wider mb-6">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             COMMUNITY KIOSK — OPEN TO ALL
           </div>
 
-          <h1 className="text-5xl md:text-7xl font-black text-white tracking-tight leading-none mb-4">
+          {/* Logo */}
+          <div className="flex justify-center mb-4">
+            <img
+              src="/lack-logo.jpg"
+              alt="LACK Logo"
+              className="w-40 h-40 md:w-52 md:h-52 object-cover rounded-2xl shadow-2xl shadow-emerald-950/50 border border-white/10"
+            />
+          </div>
+
+          <h1 className="text-5xl md:text-7xl font-black text-white tracking-tight leading-none mb-2">
             <span className="text-emerald-400">LACK</span>
           </h1>
           <p className="text-xl md:text-2xl font-light text-zinc-300 mb-2">

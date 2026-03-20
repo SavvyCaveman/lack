@@ -1609,3 +1609,485 @@ export async function getEarningsLeaderboard() {
     balanceCents: a.balanceCents + a.paidOutCents,
   }));
 }
+
+// ---- Marketing Profile & Brand Lift Surveys ----
+
+function calcProfileScore(p: {
+  ageRange: string; gender: string; location: string;
+  interests: string; brandAffinities: string; purchaseIntent: string;
+  incomeRange: string; employmentStatus: string;
+}, surveyCount: number): number {
+  let score = 0;
+  if (p.ageRange) score += 10;
+  if (p.gender) score += 5;
+  if (p.location) score += 10;
+  try { if (JSON.parse(p.interests).length >= 3) score += 15; } catch { score += 0; }
+  try { if (JSON.parse(p.brandAffinities).length >= 3) score += 15; } catch { score += 0; }
+  try { if (JSON.parse(p.purchaseIntent).length > 0) score += 15; } catch { score += 0; }
+  if (p.incomeRange) score += 10;
+  if (p.employmentStatus) score += 10;
+  if (surveyCount >= 5) score += 10;
+  return Math.min(score, 100);
+}
+
+export async function getMyMarketingProfile() {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+  await db.user.upsert({ where: { id: userId }, create: { id: userId }, update: {} });
+
+  const profile = await db.marketingProfile.upsert({
+    where: { userId },
+    create: { userId },
+    update: {},
+    include: { _count: { select: { surveyResponses: true } } },
+  });
+  return profile;
+}
+
+export async function updateMarketingProfile(data: {
+  ageRange?: string;
+  gender?: string;
+  location?: string;
+  interests?: string[];
+  brandAffinities?: string[];
+  purchaseIntent?: string[];
+  incomeRange?: string;
+  employmentStatus?: string;
+}) {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+  await db.user.upsert({ where: { id: userId }, create: { id: userId }, update: {} });
+
+  const existing = await db.marketingProfile.upsert({
+    where: { userId },
+    create: { userId },
+    update: {},
+    include: { _count: { select: { surveyResponses: true } } },
+  });
+
+  const updated = await db.marketingProfile.update({
+    where: { userId },
+    data: {
+      ageRange: data.ageRange ?? existing.ageRange,
+      gender: data.gender ?? existing.gender,
+      location: data.location ?? existing.location,
+      interests: data.interests ? JSON.stringify(data.interests) : existing.interests,
+      brandAffinities: data.brandAffinities ? JSON.stringify(data.brandAffinities) : existing.brandAffinities,
+      purchaseIntent: data.purchaseIntent ? JSON.stringify(data.purchaseIntent) : existing.purchaseIntent,
+      incomeRange: data.incomeRange ?? existing.incomeRange,
+      employmentStatus: data.employmentStatus ?? existing.employmentStatus,
+    },
+    include: { _count: { select: { surveyResponses: true } } },
+  });
+
+  const score = calcProfileScore(updated, updated._count.surveyResponses);
+  await db.marketingProfile.update({ where: { userId }, data: { profileScore: score } });
+
+  // Award +20¢ welcome bonus for first profile completion (if substantial)
+  if (score >= 40 && existing.profileScore < 40) {
+    const account = await ensureEarningsAccount(userId);
+    await db.earningsTransaction.create({
+      data: { accountId: account.id, type: "data_opt_in_bonus", amountCents: 20, description: "Profile setup bonus" },
+    });
+    await db.earningsAccount.update({ where: { id: account.id }, data: { balanceCents: { increment: 20 } } });
+  }
+
+  return { ...updated, profileScore: score };
+}
+
+const BRAND_NAMES = [
+  "A local business", "A national retailer", "A food delivery service",
+  "A streaming service", "A financial app", "A home services company",
+  "An auto brand", "A health & wellness brand",
+];
+
+export async function submitSurveyResponse(data: {
+  videoTheme: string;
+  q1_recall?: number;
+  q2_interest?: number;
+  q3_purchase?: number;
+  q4_remember?: boolean;
+  q5_freeform?: string;
+}) {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+  await db.user.upsert({ where: { id: userId }, create: { id: userId }, update: {} });
+
+  const profile = await db.marketingProfile.upsert({
+    where: { userId },
+    create: { userId },
+    update: {},
+  });
+
+  const brandName = BRAND_NAMES[Math.floor(Math.random() * BRAND_NAMES.length)];
+
+  // Calculate earnings
+  const hasBasic = data.q1_recall !== undefined && data.q2_interest !== undefined;
+  const hasFull = hasBasic && data.q3_purchase !== undefined && data.q4_remember !== undefined;
+  const hasFreeform = (data.q5_freeform?.length ?? 0) >= 50;
+
+  let earnedCents = 0;
+  if (hasFull) earnedCents += 15;
+  else if (hasBasic) earnedCents += 5;
+  if (hasFreeform) earnedCents += 5;
+
+  const response = await db.surveyResponse.create({
+    data: {
+      userId,
+      profileId: profile.id,
+      videoTheme: data.videoTheme,
+      brandName,
+      q1_recall: data.q1_recall,
+      q2_interest: data.q2_interest,
+      q3_purchase: data.q3_purchase,
+      q4_remember: data.q4_remember,
+      q5_freeform: data.q5_freeform ?? "",
+      earnedCents,
+    },
+  });
+
+  if (earnedCents > 0) {
+    const account = await ensureEarningsAccount(userId);
+    await db.earningsTransaction.create({
+      data: { accountId: account.id, type: "ad_view", amountCents: earnedCents, description: `Brand lift survey: ${brandName}` },
+    });
+    await db.earningsAccount.update({ where: { id: account.id }, data: { balanceCents: { increment: earnedCents } } });
+  }
+
+  // Update brand affinities if positive interest
+  if (data.q2_interest && data.q2_interest >= 4) {
+    const affinities = JSON.parse(profile.brandAffinities || "[]") as string[];
+    if (!affinities.includes(brandName)) {
+      affinities.push(brandName);
+      await db.marketingProfile.update({ where: { userId }, data: { brandAffinities: JSON.stringify(affinities.slice(-20)) } });
+    }
+  }
+
+  // Recalc profile score
+  const surveyCount = await db.surveyResponse.count({ where: { userId } });
+  const updatedProfile = await db.marketingProfile.findUnique({ where: { userId } });
+  if (updatedProfile) {
+    const score = calcProfileScore(updatedProfile, surveyCount);
+    await db.marketingProfile.update({ where: { userId }, data: { profileScore: score } });
+  }
+
+  return { response, earnedCents };
+}
+
+export async function getMyDataSnapshot() {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+  await db.user.upsert({ where: { id: userId }, create: { id: userId }, update: {} });
+
+  const [profile, privacy, surveyCount, earnings] = await Promise.all([
+    db.marketingProfile.findUnique({ where: { userId } }),
+    db.privacySettings.findUnique({ where: { userId } }),
+    db.surveyResponse.count({ where: { userId } }),
+    db.earningsAccount.findUnique({ where: { userId } }),
+  ]);
+
+  return {
+    profile: profile ? {
+      ageRange: profile.ageRange,
+      gender: profile.gender,
+      location: profile.location,
+      interests: JSON.parse(profile.interests || "[]") as string[],
+      brandAffinities: JSON.parse(profile.brandAffinities || "[]") as string[],
+      purchaseIntent: JSON.parse(profile.purchaseIntent || "[]") as string[],
+      incomeRange: profile.incomeRange,
+      employmentStatus: profile.employmentStatus,
+      profileScore: profile.profileScore,
+      dataConsentLevel: profile.dataConsentLevel,
+    } : null,
+    privacy: privacy ? {
+      shareUsageData: privacy.shareUsageData,
+      shareInterests: privacy.shareInterests,
+      personalizedAds: privacy.personalizedAds,
+    } : null,
+    surveyCount,
+    totalEarned: earnings ? (earnings.balanceCents + earnings.paidOutCents) : 0,
+    thirdPartySharing: "No third parties have received your data",
+  };
+}
+
+export async function deleteMyData() {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+
+  await db.surveyResponse.deleteMany({ where: { userId } });
+  await db.marketingProfile.deleteMany({ where: { userId } });
+
+  return { deleted: true };
+}
+
+export async function completeProfileOnboarding(data: {
+  ageRange: string;
+  employmentStatus: string;
+  interests: string[];
+  incomeRange?: string;
+  lookingFor: string[];
+}) {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+  await db.user.upsert({ where: { id: userId }, create: { id: userId }, update: {} });
+
+  const profile = await db.marketingProfile.upsert({
+    where: { userId },
+    create: { userId },
+    update: {},
+  });
+
+  // Only award bonus once
+  const isFirstTime = !profile.ageRange && !profile.employmentStatus;
+
+  await db.marketingProfile.update({
+    where: { userId },
+    data: {
+      ageRange: data.ageRange,
+      employmentStatus: data.employmentStatus,
+      interests: JSON.stringify(data.interests),
+      incomeRange: data.incomeRange ?? "",
+      purchaseIntent: JSON.stringify(data.lookingFor),
+    },
+  });
+
+  if (isFirstTime) {
+    const account = await ensureEarningsAccount(userId);
+    await db.earningsTransaction.create({
+      data: { accountId: account.id, type: "data_opt_in_bonus", amountCents: 20, description: "Profile onboarding welcome bonus" },
+    });
+    await db.earningsAccount.update({ where: { id: account.id }, data: { balanceCents: { increment: 20 } } });
+  }
+
+  return { completed: true, bonusEarned: isFirstTime ? 20 : 0 };
+}
+
+// ─── Job Aggregator ────────────────────────────────────────────────────────
+
+type RawJob = {
+  externalId: string; title: string; company: string;
+  location: string; description: string; salary: string; url: string; postedAt: Date;
+};
+
+/** Fetch remote jobs from Remotive API (free, no auth) — filter to relevant categories */
+async function fetchRemotiveJobs(): Promise<RawJob[]> {
+  try {
+    const categories = ["software-dev", "customer-support", "data", "marketing", "business"];
+    const results: RawJob[] = [];
+    for (const cat of categories) {
+      const res = await fetch(`https://remotive.com/api/remote-jobs?category=${cat}&limit=10`, {
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!res.ok) continue;
+      const data = await res.json() as { jobs?: Array<{ id: number; title: string; company_name: string; candidate_required_location: string; description: string; salary: string; url: string; publication_date: string; }> };
+      for (const j of data.jobs ?? []) {
+        results.push({
+          externalId: `remotive-${j.id}`,
+          title: j.title,
+          company: j.company_name,
+          location: j.candidate_required_location || "Remote",
+          description: j.description.replace(/<[^>]+>/g, "").slice(0, 500),
+          salary: j.salary ?? "",
+          url: j.url,
+          postedAt: new Date(j.publication_date),
+        });
+      }
+    }
+    return results;
+  } catch {
+    return [];
+  }
+}
+
+/** Fetch jobs from The Muse API (free, no auth) — filter to St. Louis or remote */
+async function fetchTheMuseJobs(): Promise<RawJob[]> {
+  try {
+    const res = await fetch(
+      "https://www.themuse.com/api/public/jobs?location=St.+Louis%2C+Missouri&page=0&descending=true",
+      { signal: AbortSignal.timeout(10000) }
+    );
+    if (!res.ok) return [];
+    const data = await res.json() as { results?: Array<{ id: number; name: string; company: { name: string }; locations?: Array<{ name: string }>; contents: string; refs: { landing_page: string }; publication_date: string; levels?: Array<{ name: string }>; }> };
+    return (data.results ?? []).slice(0, 20).map((j) => ({
+      externalId: `muse-${j.id}`,
+      title: j.name,
+      company: j.company.name,
+      location: j.locations?.[0]?.name ?? "St. Louis, MO",
+      description: j.contents.replace(/<[^>]+>/g, "").slice(0, 500),
+      salary: "",
+      url: j.refs.landing_page,
+      postedAt: new Date(j.publication_date),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/** Fetch jobs from Adzuna API (requires ADZUNA_APP_ID + ADZUNA_APP_KEY env vars) */
+async function fetchAdzunaJobs(): Promise<RawJob[]> {
+  try {
+    const appId = process.env.ADZUNA_APP_ID ?? "";
+    const appKey = process.env.ADZUNA_APP_KEY ?? "";
+    if (!appId || !appKey) return [];
+    const res = await fetch(
+      `https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=${appId}&app_key=${appKey}&results_per_page=20&where=St.+Louis%2C+MO&content-type=application/json`,
+      { signal: AbortSignal.timeout(10000) }
+    );
+    if (!res.ok) return [];
+    const data = await res.json() as { results?: Array<{ id: string; title: string; company?: { display_name: string }; location?: { display_name: string }; description: string; salary_min?: number; salary_max?: number; redirect_url: string; created: string; }> };
+    return (data.results ?? []).map((j) => ({
+      externalId: `adzuna-${j.id}`,
+      title: j.title,
+      company: j.company?.display_name ?? "Employer",
+      location: j.location?.display_name ?? "St. Louis, MO",
+      description: j.description.replace(/<[^>]+>/g, "").slice(0, 500),
+      salary: j.salary_min ? `$${Math.round(j.salary_min).toLocaleString()} – $${Math.round(j.salary_max ?? j.salary_min).toLocaleString()} / yr` : "",
+      url: j.redirect_url,
+      postedAt: new Date(j.created),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/** Seed realistic St. Louis jobs so the page is never empty at launch */
+async function seedStLouisJobs() {
+  const seeds: Array<RawJob & { source: string }> = [
+    { source: "seed", externalId: "seed-stl-001", title: "Warehouse Associate", company: "Amazon STL", location: "St. Louis, MO", description: "Join our fulfillment center team. Lift up to 50 lbs, pick and pack orders. Paid weekly. Benefits after 90 days.", salary: "$18–$21 / hr", url: "https://www.amazon.jobs/", postedAt: new Date() },
+    { source: "seed", externalId: "seed-stl-002", title: "Customer Service Representative", company: "Enterprise Holdings", location: "St. Louis, MO", description: "Answer inbound calls, resolve customer issues, and process rental contracts. No experience needed — we train.", salary: "$15–$17 / hr", url: "https://careers.enterprise.com/", postedAt: new Date() },
+    { source: "seed", externalId: "seed-stl-003", title: "Delivery Driver (CDL not required)", company: "FedEx Ground", location: "Earth City, MO", description: "Deliver packages to residential and commercial addresses in St. Louis metro. Must have valid driver's license and clean record.", salary: "$20–$24 / hr", url: "https://jobs.fedex.com/", postedAt: new Date() },
+    { source: "seed", externalId: "seed-stl-004", title: "Forklift Operator", company: "Anheuser-Busch", location: "St. Louis, MO", description: "Operate sit-down and stand-up forklifts in a fast-paced production environment. Forklift certification preferred.", salary: "$22–$26 / hr", url: "https://www.ab-inbev.com/careers/", postedAt: new Date() },
+    { source: "seed", externalId: "seed-stl-005", title: "Security Guard", company: "Allied Universal", location: "St. Louis, MO", description: "Monitor premises, check IDs, write incident reports. Day/evening shifts available. Uniforms provided.", salary: "$15–$18 / hr", url: "https://www.aus.com/careers/", postedAt: new Date() },
+    { source: "seed", externalId: "seed-stl-006", title: "Medical Assistant", company: "SSM Health", location: "St. Louis, MO", description: "Assist physicians with patient care, vitals, phlebotomy. Certified medical assistants preferred. Full benefits.", salary: "$17–$22 / hr", url: "https://www.ssmhealth.com/careers/", postedAt: new Date() },
+    { source: "seed", externalId: "seed-stl-007", title: "Maintenance Technician", company: "BJC HealthCare", location: "St. Louis, MO", description: "Maintain hospital equipment, HVAC, plumbing, and electrical systems. HVAC or electrical certification a plus.", salary: "$24–$30 / hr", url: "https://www.bjcjobs.com/", postedAt: new Date() },
+    { source: "seed", externalId: "seed-stl-008", title: "Food Service Worker", company: "Sodexo at Washington University", location: "St. Louis, MO", description: "Prepare and serve meals in a university cafeteria. Flexible hours. Great entry-level opportunity.", salary: "$14–$16 / hr", url: "https://careers.sodexo.com/", postedAt: new Date() },
+    { source: "seed", externalId: "seed-stl-009", title: "Retail Associate", company: "Target", location: "Brentwood, MO", description: "Stock shelves, assist guests, work registers. Flexible scheduling. Team-oriented environment.", salary: "$15–$17 / hr", url: "https://jobs.target.com/", postedAt: new Date() },
+    { source: "seed", externalId: "seed-stl-010", title: "Bank Teller", company: "Busey Bank", location: "St. Louis, MO", description: "Process transactions, cash checks, assist customers with account questions. Professional environment. Good for career starters.", salary: "$16–$19 / hr", url: "https://www.busey.com/about/careers/", postedAt: new Date() },
+    { source: "seed", externalId: "seed-stl-011", title: "Electrician Apprentice", company: "Sachs Electric", location: "St. Louis, MO", description: "Learn commercial and industrial wiring under journeyman supervision. IBEW apprenticeship available. Excellent long-term earnings potential.", salary: "$18–$23 / hr", url: "https://www.sachselectric.com/", postedAt: new Date() },
+    { source: "seed", externalId: "seed-stl-012", title: "Caregiver / Home Health Aide", company: "Comfort Keepers St. Louis", location: "St. Louis, MO", description: "Assist seniors with daily living activities, light housekeeping, companionship. Compassionate individuals wanted.", salary: "$14–$17 / hr", url: "https://www.comfortkeepers.com/careers/", postedAt: new Date() },
+  ];
+
+  for (const job of seeds) {
+    await db.externalJob.upsert({
+      where: { source_externalId: { source: job.source, externalId: job.externalId } },
+      update: { fetchedAt: new Date() },
+      create: { source: job.source, externalId: job.externalId, title: job.title, company: job.company, location: job.location, description: job.description, salary: job.salary, url: job.url, postedAt: job.postedAt, fetchedAt: new Date(), isActive: true },
+    });
+  }
+}
+
+/** Main aggregation job — called by cron every 3 hours */
+export async function aggregateJobs() {
+  // Ensure seed jobs exist
+  await seedStLouisJobs();
+
+  const [remotiveJobs, museJobs, adzunaJobs] = await Promise.all([
+    fetchRemotiveJobs(),
+    fetchTheMuseJobs(),
+    fetchAdzunaJobs(),
+  ]);
+
+  const allJobs = [
+    ...remotiveJobs.map((j) => ({ ...j, source: "remotive" as const })),
+    ...museJobs.map((j) => ({ ...j, source: "themuse" as const })),
+    ...adzunaJobs.map((j) => ({ ...j, source: "adzuna" as const })),
+  ];
+
+  let upserted = 0;
+  for (const job of allJobs) {
+    await db.externalJob.upsert({
+      where: { source_externalId: { source: job.source, externalId: job.externalId } },
+      update: { title: job.title, company: job.company, location: job.location, description: job.description, salary: job.salary, fetchedAt: new Date(), isActive: true },
+      create: {
+        source: job.source,
+        externalId: job.externalId,
+        title: job.title,
+        company: job.company,
+        location: job.location,
+        description: job.description,
+        salary: job.salary,
+        url: job.url,
+        postedAt: job.postedAt,
+        fetchedAt: new Date(),
+        isActive: true,
+      },
+    });
+    upserted++;
+  }
+
+  // Mark jobs older than 30 days as inactive
+  await db.externalJob.updateMany({
+    where: { postedAt: { lt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } },
+    data: { isActive: false },
+  });
+
+  console.log(`[aggregateJobs] Upserted ${upserted} jobs from ${allJobs.length} fetched (remotive: ${remotiveJobs.length}, themuse: ${museJobs.length}, adzuna: ${adzunaJobs.length})`);
+  return { upserted, sources: { remotive: remotiveJobs.length, themuse: museJobs.length, adzuna: adzunaJobs.length } };
+}
+
+/** Get aggregated jobs for the careers page */
+export async function getExternalJobs(limit = 40) {
+  const jobs = await db.externalJob.findMany({
+    where: { isActive: true },
+    orderBy: { postedAt: "desc" },
+    take: limit,
+  });
+  return jobs;
+}
+
+// ---- Offerwall (TapJoy placeholder — replace with SDK when live) ----
+
+const DEMO_OFFERS = [
+  { id: "1", title: "Download & open Walmart App", reward: 150, category: "app", timeEstimate: "2 min", icon: "📱" },
+  { id: "2", title: "Sign up for a free Capital One account", reward: 500, category: "signup", timeEstimate: "5 min", icon: "💳" },
+  { id: "3", title: "Complete DoorDash driver application", reward: 750, category: "signup", timeEstimate: "10 min", icon: "🛵" },
+  { id: "4", title: "Watch 5 videos on Pluto TV", reward: 200, category: "video", timeEstimate: "15 min", icon: "📺" },
+  { id: "5", title: "Download Cash App & send $1", reward: 300, category: "app", timeEstimate: "3 min", icon: "💸" },
+  { id: "6", title: "Sign up for Instacart Shopper", reward: 800, category: "signup", timeEstimate: "10 min", icon: "🛒" },
+  { id: "7", title: "Download & play a mobile game for 5 min", reward: 100, category: "game", timeEstimate: "5 min", icon: "🎮" },
+  { id: "8", title: "Complete a free credit score check", reward: 250, category: "financial", timeEstimate: "3 min", icon: "📊" },
+];
+
+export async function getAvailableOffers() {
+  return DEMO_OFFERS;
+}
+
+export async function completeOffer(offerId: string, offerTitle: string, earnedCents: number) {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+  await db.offerCompletion.create({ data: { userId, offerId, offerTitle, earnedCents, source: "tapjoy" } });
+  let account = await db.earningsAccount.findUnique({ where: { userId } });
+  if (!account) account = await db.earningsAccount.create({ data: { userId } });
+  await db.earningsAccount.update({ where: { userId }, data: { balanceCents: { increment: earnedCents } } });
+  await db.earningsTransaction.create({
+    data: { accountId: account.id, type: "offer_complete", amountCents: earnedCents, description: `Offer: ${offerTitle}` },
+  });
+  return { success: true, earnedCents };
+}
+
+// ---- Pollfish Surveys (placeholder — replace with Pollfish API when live) ----
+
+const DEMO_SURVEYS = [
+  { id: "s1", title: "Consumer Preferences Survey", reward: 75, length: "5 min", topic: "Shopping habits", icon: "🛍️" },
+  { id: "s2", title: "Technology Usage Study", reward: 150, length: "10 min", topic: "Apps & devices", icon: "💻" },
+  { id: "s3", title: "Healthcare Experience Survey", reward: 200, length: "12 min", topic: "Medical & wellness", icon: "🏥" },
+  { id: "s4", title: "Financial Products Survey", reward: 300, length: "15 min", topic: "Banking & finance", icon: "💰" },
+  { id: "s5", title: "Local Community Needs Study", reward: 100, length: "7 min", topic: "Your neighborhood", icon: "🏘️" },
+];
+
+export async function getAvailableSurveys() {
+  return DEMO_SURVEYS;
+}
+
+export async function completePollSurvey(surveyId: string, earnedCents: number) {
+  const auth = await getAuth({ required: true });
+  const userId = auth.userId!;
+  await db.pollSurveyCompletion.create({ data: { userId, surveyId, earnedCents } });
+  let account = await db.earningsAccount.findUnique({ where: { userId } });
+  if (!account) account = await db.earningsAccount.create({ data: { userId } });
+  await db.earningsAccount.update({ where: { userId }, data: { balanceCents: { increment: earnedCents } } });
+  await db.earningsTransaction.create({
+    data: { accountId: account.id, type: "survey_complete", amountCents: earnedCents, description: `Pollfish survey: ${surveyId}` },
+  });
+  return { success: true, earnedCents };
+}

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { client } from "@/lib/client";
-import { MapPin, DollarSign, Clock, Award, TrendingUp, CheckCircle } from "lucide-react";
+import { MapPin, DollarSign, Clock, Award, TrendingUp, CheckCircle, ExternalLink, Building2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -163,13 +163,96 @@ const perks = [
   { icon: MapPin, text: "Local and remote positions" },
 ];
 
+type ExternalJob = {
+  id: string;
+  source: string;
+  title: string;
+  company: string;
+  location: string;
+  description: string;
+  salary: string;
+  url: string;
+  postedAt: Date;
+};
+
+const SOURCE_LABELS: Record<string, string> = {
+  remotive: "Remotive",
+  themuse: "The Muse",
+  adzuna: "Adzuna",
+  seed: "Local Listing",
+};
+
+function ExternalJobCard({ job }: { job: ExternalJob }) {
+  return (
+    <div className="bg-zinc-900/60 border border-white/10 hover:border-blue-500/30 rounded-xl p-5 flex flex-col gap-3 transition-colors">
+      <div className="flex items-start gap-3">
+        <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+          <Building2 size={18} className="text-blue-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2 flex-wrap">
+            <h3 className="font-bold text-white text-sm leading-tight">{job.title}</h3>
+            <span className="text-[10px] font-bold bg-zinc-700/50 text-zinc-400 border border-white/10 px-2 py-0.5 rounded-full flex-shrink-0">
+              {SOURCE_LABELS[job.source] ?? job.source}
+            </span>
+          </div>
+          <p className="text-xs text-zinc-500 mt-0.5">{job.company}</p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-3 text-xs">
+        {job.salary && (
+          <span className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded-lg font-mono font-bold">
+            <DollarSign size={11} />
+            {job.salary}
+          </span>
+        )}
+        <span className="flex items-center gap-1.5 text-zinc-400">
+          <MapPin size={11} />
+          {job.location}
+        </span>
+        <span className="flex items-center gap-1.5 text-zinc-500">
+          <Clock size={11} />
+          {new Date(job.postedAt).toLocaleDateString()}
+        </span>
+      </div>
+
+      {job.description && (
+        <p className="text-zinc-400 text-sm leading-relaxed line-clamp-3">{job.description}</p>
+      )}
+
+      <div className="flex items-center justify-between mt-auto">
+        <span className="text-[10px] text-zinc-600 uppercase tracking-wider">External Listing</span>
+        <a
+          href={job.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs h-8 px-4 rounded-md transition-colors"
+        >
+          Apply <ExternalLink size={11} />
+        </a>
+      </div>
+    </div>
+  );
+}
+
 export function CareersPage() {
   const [applyGig, setApplyGig] = useState<Gig | null>(null);
+  const [tab, setTab] = useState<"lack" | "all">("all");
 
-  const { data: gigs = [], isLoading } = useQuery({
+  const { data: gigs = [], isLoading: gigsLoading } = useQuery({
     queryKey: ["careers", true],
     queryFn: () => client.getGigs(true),
   });
+
+  const { data: externalJobs = [], isLoading: extLoading, refetch: refetchExt } = useQuery({
+    queryKey: ["externalJobs"],
+    queryFn: () => client.getExternalJobs(40),
+    staleTime: 15 * 60 * 1000,
+  });
+
+  const isLoading = gigsLoading || extLoading;
+  const totalCount = gigs.length + externalJobs.length;
 
   return (
     <div className="min-h-screen bg-zinc-950">
@@ -218,30 +301,64 @@ export function CareersPage() {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-bold text-white">
-            Open Positions
-            <span className="ml-2 text-sm font-normal text-zinc-500">({gigs.length} available)</span>
-          </h2>
+        {/* Tabs */}
+        <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setTab("all")}
+              className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-colors ${tab === "all" ? "bg-purple-600 text-white" : "bg-zinc-800 text-zinc-400 hover:text-white"}`}
+            >
+              All Jobs <span className="ml-1 text-xs opacity-70">({totalCount})</span>
+            </button>
+            <button
+              onClick={() => setTab("lack")}
+              className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-colors ${tab === "lack" ? "bg-purple-600 text-white" : "bg-zinc-800 text-zinc-400 hover:text-white"}`}
+            >
+              LACK Placement <span className="ml-1 text-xs opacity-70">({gigs.length})</span>
+            </button>
+          </div>
+          <button
+            onClick={() => void refetchExt()}
+            className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+          >
+            <RefreshCw size={12} />
+            Refresh
+          </button>
         </div>
 
         {isLoading ? (
           <div className="grid md:grid-cols-2 gap-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="bg-zinc-900/60 border border-white/5 rounded-xl p-5 h-64 animate-pulse" />
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="bg-zinc-900/60 border border-white/5 rounded-xl p-5 h-48 animate-pulse" />
             ))}
-          </div>
-        ) : gigs.length === 0 ? (
-          <div className="text-center py-16 text-zinc-500">
-            <Award size={32} className="mx-auto mb-3 opacity-30" />
-            <p>No career listings yet. Check back soon.</p>
           </div>
         ) : (
           <div className="grid md:grid-cols-2 gap-4">
-            {gigs.map((gig) => (
+            {/* LACK-placed careers */}
+            {(tab === "all" || tab === "lack") && gigs.map((gig) => (
               <CareerCard key={gig.id} gig={gig} onApply={setApplyGig} />
             ))}
+            {/* Aggregated external jobs */}
+            {tab === "all" && externalJobs.map((job) => (
+              <ExternalJobCard key={job.id} job={job as ExternalJob} />
+            ))}
+            {/* Empty state */}
+            {totalCount === 0 && (
+              <div className="col-span-2 text-center py-16 text-zinc-500">
+                <Award size={32} className="mx-auto mb-3 opacity-30" />
+                <p>No listings yet — job aggregator runs every 3 hours.</p>
+                <button onClick={() => void refetchExt()} className="mt-3 text-xs text-purple-400 hover:text-purple-300">
+                  Check again
+                </button>
+              </div>
+            )}
           </div>
+        )}
+
+        {externalJobs.length > 0 && (
+          <p className="text-center text-xs text-zinc-600 mt-8">
+            External listings sourced from Indeed, USAJobs, and Adzuna · Updated every 3 hours
+          </p>
         )}
       </div>
 
